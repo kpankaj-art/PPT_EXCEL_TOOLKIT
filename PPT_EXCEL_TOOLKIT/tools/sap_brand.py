@@ -1007,307 +1007,306 @@ def render():
         unsafe_allow_html=True
     )
 
-    with st.sidebar:
 
-        st.markdown("## ⚙️ Actions")
-        st.caption("Upload files and select the transfer operation.")
+    st.markdown("## ⚙️ Actions")
+    st.caption("Upload files and select the transfer operation.")
 
-        st.markdown("### 1. Upload Files")
+    st.markdown("### 1. Upload Files")
 
-        st.markdown('<div class="upload-label excel-label">Upload Excel File</div>', unsafe_allow_html=True)
+    st.markdown('<div class="upload-label excel-label">Upload Excel File</div>', unsafe_allow_html=True)
 
-        excel_file = st.file_uploader(
-            "Upload Excel File",
-            type=["xlsx", "xls"],
-            key="excel_upload"
-        )
+    excel_file = st.file_uploader(
+        "Upload Excel File",
+        type=["xlsx", "xls"],
+        key="excel_upload"
+    )
 
-        st.markdown('<div class="upload-label ppt-label">Upload PowerPoint Template</div>', unsafe_allow_html=True)
+    st.markdown('<div class="upload-label ppt-label">Upload PowerPoint Template</div>', unsafe_allow_html=True)
 
-        ppt_file = st.file_uploader(
-            "Upload PowerPoint Template",
-            type=["pptx"],
-            key="ppt_upload"
-        )
+    ppt_file = st.file_uploader(
+        "Upload PowerPoint Template",
+        type=["pptx"],
+        key="ppt_upload"
+    )
 
+    st.markdown("---")
+
+    st.markdown("### 2. Transfer Content")
+
+    add_mode = st.selectbox(
+        "Select What to Add",
+        [
+            "SAP Code",
+            "Brand",
+            "Both (SAP Code + Brand)"
+        ],
+        key="add_mode"
+    )
+
+    st.caption(
+        "SAP Code is added below District. "
+        "Brand is placed in the designated brand area."
+    )
+
+    # ---------------------------------------------------------
+    # MANUAL MATCH COLUMN SELECTION
+    # ---------------------------------------------------------
+    # Auto-detection remains the default, but the user can
+    # explicitly choose which Excel columns contain Name and
+    # Contact. This removes dependency on Excel heading names.
+    manual_name_col = None
+    manual_contact_col = None
+
+    if excel_file is not None:
+        try:
+            excel_preview = pd.read_excel(io.BytesIO(excel_file.getvalue()), nrows=0)
+            excel_columns = [str(col) for col in excel_preview.columns]
+
+            auto_mapping_preview = detect_columns(excel_preview)
+            auto_name = auto_mapping_preview.get("name")
+            auto_contact = auto_mapping_preview.get("contact")
+
+            st.markdown("### 3. Match Columns")
+            st.caption("Choose the Excel columns used to match each PPT record. Auto Detect is selected by default.")
+
+            name_options = ["Auto Detect"] + excel_columns
+            contact_options = ["Auto Detect"] + excel_columns
+
+            name_default = (
+                name_options.index(str(auto_name))
+                if auto_name is not None and str(auto_name) in name_options
+                else 0
+            )
+            contact_default = (
+                contact_options.index(str(auto_contact))
+                if auto_contact is not None and str(auto_contact) in contact_options
+                else 0
+            )
+
+            selected_name_col = st.selectbox(
+                "Match Name using Excel column",
+                name_options,
+                index=name_default,
+                key="match_name_column"
+            )
+
+            selected_contact_col = st.selectbox(
+                "Match Contact using Excel column",
+                contact_options,
+                index=contact_default,
+                key="match_contact_column"
+            )
+
+            if selected_name_col != "Auto Detect":
+                manual_name_col = selected_name_col
+
+            if selected_contact_col != "Auto Detect":
+                manual_contact_col = selected_contact_col
+
+            if auto_name or auto_contact:
+                st.caption(
+                    f"Auto detected → Name: {auto_name or 'Not found'} | "
+                    f"Contact: {auto_contact or 'Not found'}"
+                )
+        except Exception as column_error:
+            st.warning(f"Could not read Excel headings: {column_error}")
+
+    st.markdown("---")
+
+    ready = excel_file is not None and ppt_file is not None
+
+    if ready:
+        st.success("Files are ready.")
+    else:
+        st.info("Upload both files to continue.")
+
+    st.caption("Downloads appear after a successful transfer.")
+
+    process_button = st.button(
+        "🚀 Transfer / Update PowerPoint",
+        type="primary",
+        use_container_width=True,
+        disabled=not ready
+    )
+
+    if ready:
         st.markdown("---")
+        st.caption("Selected files")
+        st.write(f"**Excel:** {excel_file.name}")
+        st.write(f"**PowerPoint:** {ppt_file.name}")
 
-        st.markdown("### 2. Transfer Content")
+if not (excel_file and ppt_file):
+    st.markdown('<div class="section-title">Ready to Transfer</div>', unsafe_allow_html=True)
+    st.info(
+        "Upload one Excel file and one PowerPoint template, select the content to transfer, "
+        "then click Transfer / Update PowerPoint."
+    )
 
-        add_mode = st.selectbox(
-            "Select What to Add",
-            [
-                "SAP Code",
-                "Brand",
-                "Both (SAP Code + Brand)"
-            ],
-            key="add_mode"
+if excel_file and ppt_file and process_button:
+    try:
+        progress = st.progress(0, text="Starting... 0%")
+        status_box = st.empty()
+        status_box.info("Reading files and preparing the transfer...")
+
+        df = pd.read_excel(excel_file)
+        mapping = detect_columns(df)
+
+        # Manual Name/Contact selections override automatic detection.
+        # SAP Code, Brand and the remaining fields continue to use the
+        # existing automatic detection logic.
+        if manual_name_col and manual_name_col in df.columns:
+            mapping["name"] = manual_name_col
+
+        if manual_contact_col and manual_contact_col in df.columns:
+            mapping["contact"] = manual_contact_col
+
+        missing = []
+        if not mapping.get("name"):
+            missing.append("Outlet / Dealer Name")
+        if not mapping.get("contact"):
+            missing.append("Contact Number")
+        if not mapping.get("sap") and add_mode in ["SAP Code", "Both (SAP Code + Brand)"]:
+            missing.append("SAP Code / Customer Code")
+        if not mapping.get("brand") and add_mode in ["Brand", "Both (SAP Code + Brand)"]:
+            missing.append("Brand")
+
+        if missing:
+            progress.empty()
+            status_box.error("Required Excel columns could not be detected: " + ", ".join(missing))
+            st.stop()
+
+        prs = Presentation(io.BytesIO(ppt_file.getvalue()))
+        ppt_slides = extract_ppt_fields(prs)
+
+        # ---------------- SAFE MATCHING ----------------
+        matching_results = []
+        used_slides = set()
+        total_rows = len(df)
+
+        for row_number, (excel_index, row) in enumerate(df.iterrows(), start=1):
+            excel_name = row.get(mapping.get("name"), "")
+            excel_contact = row.get(mapping.get("contact"), "")
+            sap_code = row.get(mapping.get("sap"), "") if mapping.get("sap") else ""
+            brand_value = row.get(mapping.get("brand"), "") if mapping.get("brand") else ""
+            excel_size = get_excel_size(row, mapping)
+
+            try:
+                if pd.isna(brand_value):
+                    brand_value = ""
+            except Exception:
+                pass
+            brand_value = str(brand_value).strip()
+
+            matched_slide, reason = find_best_slide(row, ppt_slides, mapping, used_slides)
+
+            if matched_slide is not None:
+                slide_no = matched_slide["slide"]
+                used_slides.add(slide_no)
+                matching_results.append({
+                    "excel_row": excel_index + 2,
+                    "excel_name": str(excel_name),
+                    "excel_contact": str(excel_contact),
+                    "excel_size": excel_size,
+                    "sap": str(sap_code),
+                    "brand": brand_value,
+                    "slide": slide_no,
+                    "ppt_name": matched_slide["name"],
+                    "ppt_contact": matched_slide["contact"],
+                    "ppt_size": matched_slide["size"],
+                    "info_shape_index": matched_slide["info_shape_index"],
+                    "matched": True,
+                    "reason": reason
+                })
+            else:
+                matching_results.append({
+                    "excel_row": excel_index + 2,
+                    "excel_name": str(excel_name),
+                    "excel_contact": str(excel_contact),
+                    "excel_size": excel_size,
+                    "sap": str(sap_code),
+                    "brand": brand_value,
+                    "slide": "",
+                    "ppt_name": "",
+                    "ppt_contact": "",
+                    "ppt_size": "",
+                    "info_shape_index": None,
+                    "matched": False,
+                    "reason": reason
+                })
+
+            percent = int((row_number / max(total_rows, 1)) * 50)
+            progress.progress(percent, text=f"Matching records... {row_number}/{total_rows} ({percent}%)")
+            status_box.info(f"Matching record {row_number} of {total_rows}...")
+
+        matched_count = sum(1 for result in matching_results if result["matched"])
+        unmatched_count = len(matching_results) - matched_count
+
+        # ---------------- POWERPOINT UPDATE ----------------
+        total_updates = len(matching_results)
+
+        def update_progress(done, total):
+            percent = 50 + int((done / max(total, 1)) * 50)
+            progress.progress(percent, text=f"Updating PowerPoint... {done}/{total} ({percent}%)")
+            status_box.info(f"Updating PowerPoint... {done} of {total}...")
+
+        updated_count, failed_count = update_ppt(
+            prs,
+            matching_results,
+            add_mode,
+            progress_callback=update_progress
         )
+
+        progress.progress(100, text="Completed — 100%")
+        status_box.success(f"Processing complete — {updated_count} slide(s) updated.")
+
+        # ---------------- SAVE OUTPUT ----------------
+        ppt_output = io.BytesIO()
+        prs.save(ppt_output)
+        ppt_output.seek(0)
+        final_ppt_bytes = ppt_output.getvalue()
+
+        base_ppt_name = re.sub(r"\.pptx$", "", ppt_file.name, flags=re.IGNORECASE)
+        updated_name = safe_filename(base_ppt_name + "_Update.pptx")
+
+        excel_base_name = re.sub(r"\.(xlsx|xls)$", "", excel_file.name, flags=re.IGNORECASE)
+        report_name = safe_filename(excel_base_name + "_Matching_Report.xlsx")
+
+        # ---------------- COMPLETION ----------------
+        st.success(
+            f"Transfer completed successfully. Updated: {updated_count} | "
+            f"Not matched: {unmatched_count}"
+        )
+
+        if failed_count > 0:
+            st.warning(f"{failed_count} matched slide(s) could not be updated.")
+
+        st.markdown("### 📥 Download Center")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.download_button(
+                "📥 Download Updated PowerPoint",
+                data=final_ppt_bytes,
+                file_name=updated_name,
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                use_container_width=True
+            )
+
+        with col2:
+            report_bytes = create_report_excel(matching_results)
+            st.download_button(
+                "📊 Download Matching Report",
+                data=report_bytes,
+                file_name=report_name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
 
         st.caption(
-            "SAP Code is added below District. "
-            "Brand is placed in the designated brand area."
+            "Safety rule: transfer is performed only after a unique Name + Contact match is confirmed. "
+            "Duplicate Name + Contact records are verified using Size."
         )
 
-        # ---------------------------------------------------------
-        # MANUAL MATCH COLUMN SELECTION
-        # ---------------------------------------------------------
-        # Auto-detection remains the default, but the user can
-        # explicitly choose which Excel columns contain Name and
-        # Contact. This removes dependency on Excel heading names.
-        manual_name_col = None
-        manual_contact_col = None
-
-        if excel_file is not None:
-            try:
-                excel_preview = pd.read_excel(io.BytesIO(excel_file.getvalue()), nrows=0)
-                excel_columns = [str(col) for col in excel_preview.columns]
-
-                auto_mapping_preview = detect_columns(excel_preview)
-                auto_name = auto_mapping_preview.get("name")
-                auto_contact = auto_mapping_preview.get("contact")
-
-                st.markdown("### 3. Match Columns")
-                st.caption("Choose the Excel columns used to match each PPT record. Auto Detect is selected by default.")
-
-                name_options = ["Auto Detect"] + excel_columns
-                contact_options = ["Auto Detect"] + excel_columns
-
-                name_default = (
-                    name_options.index(str(auto_name))
-                    if auto_name is not None and str(auto_name) in name_options
-                    else 0
-                )
-                contact_default = (
-                    contact_options.index(str(auto_contact))
-                    if auto_contact is not None and str(auto_contact) in contact_options
-                    else 0
-                )
-
-                selected_name_col = st.selectbox(
-                    "Match Name using Excel column",
-                    name_options,
-                    index=name_default,
-                    key="match_name_column"
-                )
-
-                selected_contact_col = st.selectbox(
-                    "Match Contact using Excel column",
-                    contact_options,
-                    index=contact_default,
-                    key="match_contact_column"
-                )
-
-                if selected_name_col != "Auto Detect":
-                    manual_name_col = selected_name_col
-
-                if selected_contact_col != "Auto Detect":
-                    manual_contact_col = selected_contact_col
-
-                if auto_name or auto_contact:
-                    st.caption(
-                        f"Auto detected → Name: {auto_name or 'Not found'} | "
-                        f"Contact: {auto_contact or 'Not found'}"
-                    )
-            except Exception as column_error:
-                st.warning(f"Could not read Excel headings: {column_error}")
-
-        st.markdown("---")
-
-        ready = excel_file is not None and ppt_file is not None
-
-        if ready:
-            st.success("Files are ready.")
-        else:
-            st.info("Upload both files to continue.")
-
-        st.caption("Downloads appear after a successful transfer.")
-
-        process_button = st.button(
-            "🚀 Transfer / Update PowerPoint",
-            type="primary",
-            use_container_width=True,
-            disabled=not ready
-        )
-
-        if ready:
-            st.markdown("---")
-            st.caption("Selected files")
-            st.write(f"**Excel:** {excel_file.name}")
-            st.write(f"**PowerPoint:** {ppt_file.name}")
-
-    if not (excel_file and ppt_file):
-        st.markdown('<div class="section-title">Ready to Transfer</div>', unsafe_allow_html=True)
-        st.info(
-            "Upload one Excel file and one PowerPoint template, select the content to transfer, "
-            "then click Transfer / Update PowerPoint."
-        )
-
-    if excel_file and ppt_file and process_button:
-        try:
-            progress = st.progress(0, text="Starting... 0%")
-            status_box = st.empty()
-            status_box.info("Reading files and preparing the transfer...")
-
-            df = pd.read_excel(excel_file)
-            mapping = detect_columns(df)
-
-            # Manual Name/Contact selections override automatic detection.
-            # SAP Code, Brand and the remaining fields continue to use the
-            # existing automatic detection logic.
-            if manual_name_col and manual_name_col in df.columns:
-                mapping["name"] = manual_name_col
-
-            if manual_contact_col and manual_contact_col in df.columns:
-                mapping["contact"] = manual_contact_col
-
-            missing = []
-            if not mapping.get("name"):
-                missing.append("Outlet / Dealer Name")
-            if not mapping.get("contact"):
-                missing.append("Contact Number")
-            if not mapping.get("sap") and add_mode in ["SAP Code", "Both (SAP Code + Brand)"]:
-                missing.append("SAP Code / Customer Code")
-            if not mapping.get("brand") and add_mode in ["Brand", "Both (SAP Code + Brand)"]:
-                missing.append("Brand")
-
-            if missing:
-                progress.empty()
-                status_box.error("Required Excel columns could not be detected: " + ", ".join(missing))
-                st.stop()
-
-            prs = Presentation(io.BytesIO(ppt_file.getvalue()))
-            ppt_slides = extract_ppt_fields(prs)
-
-            # ---------------- SAFE MATCHING ----------------
-            matching_results = []
-            used_slides = set()
-            total_rows = len(df)
-
-            for row_number, (excel_index, row) in enumerate(df.iterrows(), start=1):
-                excel_name = row.get(mapping.get("name"), "")
-                excel_contact = row.get(mapping.get("contact"), "")
-                sap_code = row.get(mapping.get("sap"), "") if mapping.get("sap") else ""
-                brand_value = row.get(mapping.get("brand"), "") if mapping.get("brand") else ""
-                excel_size = get_excel_size(row, mapping)
-
-                try:
-                    if pd.isna(brand_value):
-                        brand_value = ""
-                except Exception:
-                    pass
-                brand_value = str(brand_value).strip()
-
-                matched_slide, reason = find_best_slide(row, ppt_slides, mapping, used_slides)
-
-                if matched_slide is not None:
-                    slide_no = matched_slide["slide"]
-                    used_slides.add(slide_no)
-                    matching_results.append({
-                        "excel_row": excel_index + 2,
-                        "excel_name": str(excel_name),
-                        "excel_contact": str(excel_contact),
-                        "excel_size": excel_size,
-                        "sap": str(sap_code),
-                        "brand": brand_value,
-                        "slide": slide_no,
-                        "ppt_name": matched_slide["name"],
-                        "ppt_contact": matched_slide["contact"],
-                        "ppt_size": matched_slide["size"],
-                        "info_shape_index": matched_slide["info_shape_index"],
-                        "matched": True,
-                        "reason": reason
-                    })
-                else:
-                    matching_results.append({
-                        "excel_row": excel_index + 2,
-                        "excel_name": str(excel_name),
-                        "excel_contact": str(excel_contact),
-                        "excel_size": excel_size,
-                        "sap": str(sap_code),
-                        "brand": brand_value,
-                        "slide": "",
-                        "ppt_name": "",
-                        "ppt_contact": "",
-                        "ppt_size": "",
-                        "info_shape_index": None,
-                        "matched": False,
-                        "reason": reason
-                    })
-
-                percent = int((row_number / max(total_rows, 1)) * 50)
-                progress.progress(percent, text=f"Matching records... {row_number}/{total_rows} ({percent}%)")
-                status_box.info(f"Matching record {row_number} of {total_rows}...")
-
-            matched_count = sum(1 for result in matching_results if result["matched"])
-            unmatched_count = len(matching_results) - matched_count
-
-            # ---------------- POWERPOINT UPDATE ----------------
-            total_updates = len(matching_results)
-
-            def update_progress(done, total):
-                percent = 50 + int((done / max(total, 1)) * 50)
-                progress.progress(percent, text=f"Updating PowerPoint... {done}/{total} ({percent}%)")
-                status_box.info(f"Updating PowerPoint... {done} of {total}...")
-
-            updated_count, failed_count = update_ppt(
-                prs,
-                matching_results,
-                add_mode,
-                progress_callback=update_progress
-            )
-
-            progress.progress(100, text="Completed — 100%")
-            status_box.success(f"Processing complete — {updated_count} slide(s) updated.")
-
-            # ---------------- SAVE OUTPUT ----------------
-            ppt_output = io.BytesIO()
-            prs.save(ppt_output)
-            ppt_output.seek(0)
-            final_ppt_bytes = ppt_output.getvalue()
-
-            base_ppt_name = re.sub(r"\.pptx$", "", ppt_file.name, flags=re.IGNORECASE)
-            updated_name = safe_filename(base_ppt_name + "_Update.pptx")
-
-            excel_base_name = re.sub(r"\.(xlsx|xls)$", "", excel_file.name, flags=re.IGNORECASE)
-            report_name = safe_filename(excel_base_name + "_Matching_Report.xlsx")
-
-            # ---------------- COMPLETION ----------------
-            st.success(
-                f"Transfer completed successfully. Updated: {updated_count} | "
-                f"Not matched: {unmatched_count}"
-            )
-
-            if failed_count > 0:
-                st.warning(f"{failed_count} matched slide(s) could not be updated.")
-
-            st.markdown("### 📥 Download Center")
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.download_button(
-                    "📥 Download Updated PowerPoint",
-                    data=final_ppt_bytes,
-                    file_name=updated_name,
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    use_container_width=True
-                )
-
-            with col2:
-                report_bytes = create_report_excel(matching_results)
-                st.download_button(
-                    "📊 Download Matching Report",
-                    data=report_bytes,
-                    file_name=report_name,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
-
-            st.caption(
-                "Safety rule: transfer is performed only after a unique Name + Contact match is confirmed. "
-                "Duplicate Name + Contact records are verified using Size."
-            )
-
-        except Exception as e:
-            st.error("An error occurred while processing the files.")
-            st.exception(e)
+    except Exception as e:
+        st.error("An error occurred while processing the files.")
+        st.exception(e)
