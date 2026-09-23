@@ -1,21 +1,345 @@
 import streamlit as st
-
 import pandas as pd
-
 import re
-
 import io
-
 from pptx import Presentation
-
 from pptx.util import Pt, Inches
-
 from pptx.enum.text import MSO_VERTICAL_ANCHOR
-
 from difflib import SequenceMatcher
+
+
+# =========================================================
+# PAGE SETTINGS
+# =========================================================
+
+st.set_page_config(
+    page_title="SAP / Brand Transfer Tool",
+    page_icon="📊",
+    layout="wide"
+)
+
+st.title("📊 Transfer Workspace")
+st.caption("Transfer SAP Code and/or Brand from Excel to PowerPoint with safe matching.")
+
+# =========================================================
+# PROFESSIONAL UI STYLING
+# =========================================================
+
+st.markdown(
+    """
+    <style>
+        /* ---------- UPLOAD LABEL HIGHLIGHTS ---------- */
+
+        .upload-label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            line-height: 1.15;
+            padding: 0.38rem 0.55rem;
+            margin: 0.08rem 0 0.22rem 0;
+            border-radius: 6px;
+            border-left: 4px solid;
+            letter-spacing: 0.01em;
+        }
+
+        .excel-label {
+            background: rgba(46, 160, 67, 0.16);
+            border-left-color: #2ea043;
+        }
+
+        .ppt-label {
+            background: rgba(220, 70, 70, 0.16);
+            border-left-color: #dc4646;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stFileUploader"] label {
+            font-size: 0 !important;
+            line-height: 0 !important;
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stFileUploader"] > label {
+            display: none !important;
+        }
+
+        /* ---------- LARGER SECTION / ACTION TEXT ---------- */
+
+        [data-testid="stSidebar"] h2 {
+            font-size: 1.02rem !important;
+        }
+
+        [data-testid="stSidebar"] h3 {
+            font-size: 0.86rem !important;
+        }
+
+        [data-testid="stSidebar"] .stCaption {
+            font-size: 0.64rem !important;
+        }
+
+        [data-testid="stSidebar"] .stButton button {
+            font-size: 0.70rem !important;
+        }
+
+        [data-testid="stSidebar"] [data-baseweb="select"] * {
+            font-size: 0.69rem !important;
+        }
+
+        /* =====================================================
+           TIGHT PROFESSIONAL SIDEBAR
+           Reduce unnecessary vertical gaps while keeping the
+           sidebar readable and professional.
+           ===================================================== */
+
+        .block-container {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0.55rem 0.85rem 1rem 0.85rem !important;
+            overflow-x: hidden !important;
+        }
+
+        /* ---------- SIDEBAR WIDTH ---------- */
+
+        [data-testid="stSidebar"] {
+            width: 275px !important;
+            min-width: 275px !important;
+            max-width: 275px !important;
+        }
+
+        [data-testid="stSidebar"] > div:first-child {
+            width: 275px !important;
+        }
+
+        [data-testid="stSidebar"] .block-container {
+            width: 100% !important;
+            padding: 0.35rem 0.65rem 0.6rem 0.65rem !important;
+            overflow-x: hidden !important;
+        }
+
+        /* ---------- ACTION HEADER ---------- */
+
+        [data-testid="stSidebar"] h2 {
+            font-size: 0.95rem !important;
+            line-height: 1.05 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        [data-testid="stSidebar"] h3 {
+            font-size: 0.78rem !important;
+            line-height: 1.05 !important;
+            margin: 0.25rem 0 0.18rem 0 !important;
+            padding: 0 !important;
+        }
+
+        [data-testid="stSidebar"] .stCaption {
+            font-size: 0.61rem !important;
+            line-height: 1.1 !important;
+            margin: 0.08rem 0 0.25rem 0 !important;
+        }
+
+        [data-testid="stSidebar"] p {
+            font-size: 0.63rem !important;
+            line-height: 1.1 !important;
+            margin-top: 0.08rem !important;
+            margin-bottom: 0.18rem !important;
+        }
+
+        /* ---------- FILE UPLOAD SECTION ---------- */
+
+        [data-testid="stSidebar"] [data-testid="stFileUploader"] {
+            margin: 0 0 0.18rem 0 !important;
+            padding: 0 !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+            min-height: 68px !important;
+            height: 68px !important;
+            padding: 0.3rem 0.45rem !important;
+            border-radius: 7px !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] {
+            padding: 0 !important;
+            gap: 0.15rem !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] > div {
+            font-size: 0.62rem !important;
+            line-height: 1.05 !important;
+        }
+
+        /* Uploaded file name */
+        [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
+            margin: 0 !important;
+            padding: 0.15rem 0.25rem !important;
+        }
+
+        /* ---------- SELECT ---------- */
+
+        [data-testid="stSidebar"] [data-baseweb="select"] {
+            min-height: 34px !important;
+            height: 34px !important;
+        }
+
+        [data-testid="stSidebar"] [data-baseweb="select"] * {
+            font-size: 0.66rem !important;
+        }
+
+        /* ---------- ACTION BUTTON ---------- */
+
+        [data-testid="stSidebar"] .stButton {
+            margin-top: 0.25rem !important;
+            margin-bottom: 0.25rem !important;
+        }
+
+        [data-testid="stSidebar"] .stButton button {
+            min-height: 36px !important;
+            height: 36px !important;
+            padding: 0.25rem 0.45rem !important;
+            font-size: 0.67rem !important;
+            line-height: 1.05 !important;
+            border-radius: 7px !important;
+        }
+
+        /* ---------- DIVIDERS ---------- */
+
+        [data-testid="stSidebar"] hr {
+            margin: 0.35rem 0 !important;
+            padding: 0 !important;
+        }
+
+        /* ---------- FILE STATUS ---------- */
+
+        [data-testid="stSidebar"] [data-testid="stAlert"] {
+            padding: 0.25rem 0.4rem !important;
+            margin: 0.15rem 0 !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stAlert"] p {
+            font-size: 0.60rem !important;
+            line-height: 1.05 !important;
+            margin: 0 !important;
+        }
+
+        /* ---------- MAIN WORKSPACE ---------- */
+
+        h1 {
+            font-size: 1.45rem !important;
+            line-height: 1.05 !important;
+            margin: 0 0 0.15rem 0 !important;
+            white-space: nowrap !important;
+        }
+
+        .main .stCaption {
+            font-size: 0.64rem !important;
+            line-height: 1.1 !important;
+            margin: 0 0 0.25rem 0 !important;
+        }
+
+        .section-title {
+            font-size: 0.80rem !important;
+            line-height: 1.05 !important;
+            font-weight: 700 !important;
+            margin: 0.25rem 0 0.18rem 0 !important;
+        }
+
+        .main h2 {
+            font-size: 0.84rem !important;
+            line-height: 1.05 !important;
+            margin: 0.3rem 0 0.18rem 0 !important;
+        }
+
+        .main h3 {
+            font-size: 0.76rem !important;
+            line-height: 1.05 !important;
+            margin: 0.25rem 0 0.15rem 0 !important;
+        }
+
+        .main p,
+        .main label {
+            font-size: 0.63rem !important;
+            line-height: 1.1 !important;
+        }
+
+        [data-testid="stDataFrame"] {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+        }
+
+        [data-testid="stMetric"] {
+            padding: 0.1rem 0.25rem !important;
+        }
+
+        [data-testid="stMetricValue"] {
+            font-size: 1rem !important;
+        }
+
+        [data-testid="stMetricLabel"] {
+            font-size: 0.58rem !important;
+        }
+
+        [data-testid="stAlert"] {
+            padding: 0.3rem 0.45rem !important;
+            margin: 0.2rem 0 !important;
+        }
+
+        [data-testid="stAlert"] p {
+            font-size: 0.62rem !important;
+            line-height: 1.1 !important;
+        }
+
+        .main .stButton button,
+        .main .stDownloadButton button {
+            min-height: 34px !important;
+            padding: 0.25rem 0.5rem !important;
+            font-size: 0.66rem !important;
+        }
+
+        [data-testid="stSidebar"] *,
+        .main * {
+            overflow-wrap: anywhere !important;
+        }
+
+        @media (max-width: 1200px) {
+            [data-testid="stSidebar"],
+            [data-testid="stSidebar"] > div:first-child {
+                width: 250px !important;
+                min-width: 250px !important;
+                max-width: 250px !important;
+            }
+
+            h1 {
+                font-size: 1.28rem !important;
+            }
+        }
+
+        @media (max-width: 900px) {
+            [data-testid="stSidebar"],
+            [data-testid="stSidebar"] > div:first-child {
+                width: 225px !important;
+                min-width: 225px !important;
+                max-width: 225px !important;
+            }
+
+            h1 {
+                font-size: 1.12rem !important;
+            }
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# =========================================================
+# HELPER FUNCTIONS
+# =========================================================
 
 def safe_filename(name):
     return re.sub(r'[\\/:*?"<>|]+', "_", name).strip()
+
 
 def normalize_text(value):
     if value is None:
@@ -34,6 +358,7 @@ def normalize_text(value):
     value = re.sub(r"\s+", " ", value).strip()
 
     return value
+
 
 def normalize_phone(value):
     if value is None:
@@ -65,6 +390,7 @@ def normalize_phone(value):
 
     return list(dict.fromkeys(numbers))
 
+
 def normalize_size(value):
     if value is None:
         return ""
@@ -87,10 +413,12 @@ def normalize_size(value):
 
     return value
 
+
 def sizes_equal(size1, size2):
     s1 = normalize_size(size1)
     s2 = normalize_size(size2)
     return s1 != "" and s2 != "" and s1 == s2
+
 
 def names_similar(name1, name2, threshold=0.88):
     n1 = normalize_text(name1)
@@ -103,6 +431,11 @@ def names_similar(name1, name2, threshold=0.88):
         return True
 
     return SequenceMatcher(None, n1, n2).ratio() >= threshold
+
+
+# =========================================================
+# EXCEL COLUMN DETECTION
+# =========================================================
 
 def clean_column_name(col):
     """Normalize Excel headings so SAP/Brand are detected regardless of case or separators."""
@@ -121,6 +454,7 @@ def clean_column_name(col):
     value = str(col).strip().upper()
     value = re.sub(r"[^A-Z0-9]", "", value)
     return value
+
 
 def detect_columns(df):
     """
@@ -233,6 +567,11 @@ def detect_columns(df):
 
     return mapping
 
+
+# =========================================================
+# POWERPOINT PARSING
+# =========================================================
+
 def parse_label_line(line):
 
     if not line:
@@ -263,6 +602,7 @@ def parse_label_line(line):
 
     return None, None
 
+
 def extract_shape_text(shape):
     try:
         if hasattr(shape, "text"):
@@ -270,6 +610,7 @@ def extract_shape_text(shape):
     except:
         pass
     return ""
+
 
 def extract_ppt_fields(prs):
     slides_data = []
@@ -309,6 +650,11 @@ def extract_ppt_fields(prs):
 
     return slides_data
 
+
+# =========================================================
+# SIZE FROM EXCEL
+# =========================================================
+
 def get_excel_size(row, mapping):
 
     width_col = mapping.get("width")
@@ -330,6 +676,11 @@ def get_excel_size(row, mapping):
         return normalize_size(row.get(size_col, ""))
 
     return ""
+
+
+# =========================================================
+# SAFE MATCHING
+# =========================================================
 
 def find_best_slide(excel_row, ppt_slides, mapping, used_slides):
     excel_name = excel_row.get(mapping.get("name"), "")
@@ -372,6 +723,11 @@ def find_best_slide(excel_row, ppt_slides, mapping, used_slides):
 
     return candidates[0], "Matched by Name + Contact"
 
+
+# =========================================================
+# TEXT FORMATTING
+# =========================================================
+
 def clear_and_add_bold_text(shape, lines, font_size=15):
 
     shape.text_frame.clear()
@@ -397,6 +753,11 @@ def clear_and_add_bold_text(shape, lines, font_size=15):
         shape.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.MIDDLE
     except:
         pass
+
+
+# =========================================================
+# UPDATE EXISTING INFORMATION BOX
+# =========================================================
 
 def add_sap_to_info_shape(shape, sap_code):
     sap_code = "" if sap_code is None else str(sap_code).strip()
@@ -436,6 +797,11 @@ def add_sap_to_info_shape(shape, sap_code):
 
     return True
 
+
+# =========================================================
+# BRAND TEXTBOX
+# =========================================================
+
 def find_info_shape(slide, info_shape_index):
     if info_shape_index is not None:
         try:
@@ -452,6 +818,7 @@ def find_info_shape(slide, info_shape_index):
         if "outlet name" in text and "contact" in text:
             return shape
     return None
+
 
 def add_brand_in_green_area(slide, info_shape, brand_text):
 
@@ -530,6 +897,11 @@ def add_brand_in_green_area(slide, info_shape, brand_text):
 
     return True
 
+
+# =========================================================
+# REMOVE PREVIOUSLY GENERATED BRAND BOXES
+# =========================================================
+
 def remove_old_auto_brand(slide):
 
     # XML se AUTO_BRAND textbox remove
@@ -550,6 +922,11 @@ def remove_old_auto_brand(slide):
             sp.getparent().remove(sp)
         except:
             pass
+
+
+# =========================================================
+# UPDATE POWERPOINT
+# =========================================================
 
 def update_ppt(prs, matching_results, add_mode, progress_callback=None):
 
@@ -628,6 +1005,11 @@ def update_ppt(prs, matching_results, add_mode, progress_callback=None):
 
     return updated_count, failed_count
 
+
+# =========================================================
+# MATCHING REPORT
+# =========================================================
+
 def create_report_excel(results):
 
     report_rows = []
@@ -695,619 +1077,317 @@ def create_report_excel(results):
     return output.getvalue()
 
 
-def render():
-    st.title("📊 Transfer Workspace")
+# =========================================================
+# LEFT SIDEBAR - FILES AND ACTIONS
+# =========================================================
 
-    st.caption("Transfer SAP Code and/or Brand from Excel to PowerPoint with safe matching.")
+with st.sidebar:
 
-    st.markdown(
-        """
-        <style>
-            /* ---------- UPLOAD LABEL HIGHLIGHTS ---------- */
+    st.markdown("## ⚙️ Actions")
+    st.caption("Upload files and select the transfer operation.")
 
-            .upload-label {
-                font-size: 0.78rem;
-                font-weight: 700;
-                line-height: 1.15;
-                padding: 0.38rem 0.55rem;
-                margin: 0.08rem 0 0.22rem 0;
-                border-radius: 6px;
-                border-left: 4px solid;
-                letter-spacing: 0.01em;
-            }
+    st.markdown("### 1. Upload Files")
 
-            .excel-label {
-                background: rgba(46, 160, 67, 0.16);
-                border-left-color: #2ea043;
-            }
+    st.markdown('<div class="upload-label excel-label">Upload Excel File</div>', unsafe_allow_html=True)
 
-            .ppt-label {
-                background: rgba(220, 70, 70, 0.16);
-                border-left-color: #dc4646;
-            }
-
-            [data-testid="stSidebar"] [data-testid="stFileUploader"] label {
-                font-size: 0 !important;
-                line-height: 0 !important;
-                height: 0 !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-
-            [data-testid="stSidebar"] [data-testid="stFileUploader"] > label {
-                display: none !important;
-            }
-
-            /* ---------- LARGER SECTION / ACTION TEXT ---------- */
-
-            [data-testid="stSidebar"] h2 {
-                font-size: 1.02rem !important;
-            }
-
-            [data-testid="stSidebar"] h3 {
-                font-size: 0.86rem !important;
-            }
-
-            [data-testid="stSidebar"] .stCaption {
-                font-size: 0.64rem !important;
-            }
-
-            [data-testid="stSidebar"] .stButton button {
-                font-size: 0.70rem !important;
-            }
-
-            [data-testid="stSidebar"] [data-baseweb="select"] * {
-                font-size: 0.69rem !important;
-            }
-
-            /* =====================================================
-               TIGHT PROFESSIONAL SIDEBAR
-               Reduce unnecessary vertical gaps while keeping the
-               sidebar readable and professional.
-               ===================================================== */
-
-            .block-container {
-                width: 100% !important;
-                max-width: 100% !important;
-                padding: 0.55rem 0.85rem 1rem 0.85rem !important;
-                overflow-x: hidden !important;
-            }
-
-            /* ---------- SIDEBAR WIDTH ---------- */
-
-            [data-testid="stSidebar"] {
-                width: 275px !important;
-                min-width: 275px !important;
-                max-width: 275px !important;
-            }
-
-            [data-testid="stSidebar"] > div:first-child {
-                width: 275px !important;
-            }
-
-            [data-testid="stSidebar"] .block-container {
-                width: 100% !important;
-                padding: 0.35rem 0.65rem 0.6rem 0.65rem !important;
-                overflow-x: hidden !important;
-            }
-
-            /* ---------- ACTION HEADER ---------- */
-
-            [data-testid="stSidebar"] h2 {
-                font-size: 0.95rem !important;
-                line-height: 1.05 !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-
-            [data-testid="stSidebar"] h3 {
-                font-size: 0.78rem !important;
-                line-height: 1.05 !important;
-                margin: 0.25rem 0 0.18rem 0 !important;
-                padding: 0 !important;
-            }
-
-            [data-testid="stSidebar"] .stCaption {
-                font-size: 0.61rem !important;
-                line-height: 1.1 !important;
-                margin: 0.08rem 0 0.25rem 0 !important;
-            }
-
-            [data-testid="stSidebar"] p {
-                font-size: 0.63rem !important;
-                line-height: 1.1 !important;
-                margin-top: 0.08rem !important;
-                margin-bottom: 0.18rem !important;
-            }
-
-            /* ---------- FILE UPLOAD SECTION ---------- */
-
-            [data-testid="stSidebar"] [data-testid="stFileUploader"] {
-                margin: 0 0 0.18rem 0 !important;
-                padding: 0 !important;
-            }
-
-            [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
-                min-height: 68px !important;
-                height: 68px !important;
-                padding: 0.3rem 0.45rem !important;
-                border-radius: 7px !important;
-            }
-
-            [data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] {
-                padding: 0 !important;
-                gap: 0.15rem !important;
-            }
-
-            [data-testid="stSidebar"] [data-testid="stFileUploaderDropzoneInstructions"] > div {
-                font-size: 0.62rem !important;
-                line-height: 1.05 !important;
-            }
-
-            /* Uploaded file name */
-            [data-testid="stSidebar"] [data-testid="stFileUploaderFile"] {
-                margin: 0 !important;
-                padding: 0.15rem 0.25rem !important;
-            }
-
-            /* ---------- SELECT ---------- */
-
-            [data-testid="stSidebar"] [data-baseweb="select"] {
-                min-height: 34px !important;
-                height: 34px !important;
-            }
-
-            [data-testid="stSidebar"] [data-baseweb="select"] * {
-                font-size: 0.66rem !important;
-            }
-
-            /* ---------- ACTION BUTTON ---------- */
-
-            [data-testid="stSidebar"] .stButton {
-                margin-top: 0.25rem !important;
-                margin-bottom: 0.25rem !important;
-            }
-
-            [data-testid="stSidebar"] .stButton button {
-                min-height: 36px !important;
-                height: 36px !important;
-                padding: 0.25rem 0.45rem !important;
-                font-size: 0.67rem !important;
-                line-height: 1.05 !important;
-                border-radius: 7px !important;
-            }
-
-            /* ---------- DIVIDERS ---------- */
-
-            [data-testid="stSidebar"] hr {
-                margin: 0.35rem 0 !important;
-                padding: 0 !important;
-            }
-
-            /* ---------- FILE STATUS ---------- */
-
-            [data-testid="stSidebar"] [data-testid="stAlert"] {
-                padding: 0.25rem 0.4rem !important;
-                margin: 0.15rem 0 !important;
-            }
-
-            [data-testid="stSidebar"] [data-testid="stAlert"] p {
-                font-size: 0.60rem !important;
-                line-height: 1.05 !important;
-                margin: 0 !important;
-            }
-
-            /* ---------- MAIN WORKSPACE ---------- */
-
-            h1 {
-                font-size: 1.45rem !important;
-                line-height: 1.05 !important;
-                margin: 0 0 0.15rem 0 !important;
-                white-space: nowrap !important;
-            }
-
-            .main .stCaption {
-                font-size: 0.64rem !important;
-                line-height: 1.1 !important;
-                margin: 0 0 0.25rem 0 !important;
-            }
-
-            .section-title {
-                font-size: 0.80rem !important;
-                line-height: 1.05 !important;
-                font-weight: 700 !important;
-                margin: 0.25rem 0 0.18rem 0 !important;
-            }
-
-            .main h2 {
-                font-size: 0.84rem !important;
-                line-height: 1.05 !important;
-                margin: 0.3rem 0 0.18rem 0 !important;
-            }
-
-            .main h3 {
-                font-size: 0.76rem !important;
-                line-height: 1.05 !important;
-                margin: 0.25rem 0 0.15rem 0 !important;
-            }
-
-            .main p,
-            .main label {
-                font-size: 0.63rem !important;
-                line-height: 1.1 !important;
-            }
-
-            [data-testid="stDataFrame"] {
-                width: 100% !important;
-                max-width: 100% !important;
-                margin: 0 !important;
-            }
-
-            [data-testid="stMetric"] {
-                padding: 0.1rem 0.25rem !important;
-            }
-
-            [data-testid="stMetricValue"] {
-                font-size: 1rem !important;
-            }
-
-            [data-testid="stMetricLabel"] {
-                font-size: 0.58rem !important;
-            }
-
-            [data-testid="stAlert"] {
-                padding: 0.3rem 0.45rem !important;
-                margin: 0.2rem 0 !important;
-            }
-
-            [data-testid="stAlert"] p {
-                font-size: 0.62rem !important;
-                line-height: 1.1 !important;
-            }
-
-            .main .stButton button,
-            .main .stDownloadButton button {
-                min-height: 34px !important;
-                padding: 0.25rem 0.5rem !important;
-                font-size: 0.66rem !important;
-            }
-
-            [data-testid="stSidebar"] *,
-            .main * {
-                overflow-wrap: anywhere !important;
-            }
-
-            @media (max-width: 1200px) {
-                [data-testid="stSidebar"],
-                [data-testid="stSidebar"] > div:first-child {
-                    width: 250px !important;
-                    min-width: 250px !important;
-                    max-width: 250px !important;
-                }
-
-                h1 {
-                    font-size: 1.28rem !important;
-                }
-            }
-
-            @media (max-width: 900px) {
-                [data-testid="stSidebar"],
-                [data-testid="stSidebar"] > div:first-child {
-                    width: 225px !important;
-                    min-width: 225px !important;
-                    max-width: 225px !important;
-                }
-
-                h1 {
-                    font-size: 1.12rem !important;
-                }
-            }
-        </style>
-        """,
-        unsafe_allow_html=True
+    excel_file = st.file_uploader(
+        "Upload Excel File",
+        type=["xlsx", "xls"],
+        key="excel_upload"
     )
 
-    with st.sidebar:
+    st.markdown('<div class="upload-label ppt-label">Upload PowerPoint Template</div>', unsafe_allow_html=True)
 
-        st.markdown("## ⚙️ Actions")
-        st.caption("Upload files and select the transfer operation.")
+    ppt_file = st.file_uploader(
+        "Upload PowerPoint Template",
+        type=["pptx"],
+        key="ppt_upload"
+    )
 
-        st.markdown("### 1. Upload Files")
+    st.markdown("---")
 
-        st.markdown('<div class="upload-label excel-label">Upload Excel File</div>', unsafe_allow_html=True)
+    st.markdown("### 2. Transfer Content")
 
-        excel_file = st.file_uploader(
-            "Upload Excel File",
-            type=["xlsx", "xls"],
-            key="excel_upload"
-        )
+    add_mode = st.selectbox(
+        "Select What to Add",
+        [
+            "SAP Code",
+            "Brand",
+            "Both (SAP Code + Brand)"
+        ],
+        key="add_mode"
+    )
 
-        st.markdown('<div class="upload-label ppt-label">Upload PowerPoint Template</div>', unsafe_allow_html=True)
+    st.caption(
+        "SAP Code is added below District. "
+        "Brand is placed in the designated brand area."
+    )
 
-        ppt_file = st.file_uploader(
-            "Upload PowerPoint Template",
-            type=["pptx"],
-            key="ppt_upload"
-        )
+    # ---------------------------------------------------------
+    # MANUAL MATCH COLUMN SELECTION
+    # ---------------------------------------------------------
+    # Auto-detection remains the default, but the user can
+    # explicitly choose which Excel columns contain Name and
+    # Contact. This removes dependency on Excel heading names.
+    manual_name_col = None
+    manual_contact_col = None
 
+    if excel_file is not None:
+        try:
+            excel_preview = pd.read_excel(io.BytesIO(excel_file.getvalue()), nrows=0)
+            excel_columns = [str(col) for col in excel_preview.columns]
+
+            auto_mapping_preview = detect_columns(excel_preview)
+            auto_name = auto_mapping_preview.get("name")
+            auto_contact = auto_mapping_preview.get("contact")
+
+            st.markdown("### 3. Match Columns")
+            st.caption("Choose the Excel columns used to match each PPT record. Auto Detect is selected by default.")
+
+            name_options = ["Auto Detect"] + excel_columns
+            contact_options = ["Auto Detect"] + excel_columns
+
+            name_default = (
+                name_options.index(str(auto_name))
+                if auto_name is not None and str(auto_name) in name_options
+                else 0
+            )
+            contact_default = (
+                contact_options.index(str(auto_contact))
+                if auto_contact is not None and str(auto_contact) in contact_options
+                else 0
+            )
+
+            selected_name_col = st.selectbox(
+                "Match Name using Excel column",
+                name_options,
+                index=name_default,
+                key="match_name_column"
+            )
+
+            selected_contact_col = st.selectbox(
+                "Match Contact using Excel column",
+                contact_options,
+                index=contact_default,
+                key="match_contact_column"
+            )
+
+            if selected_name_col != "Auto Detect":
+                manual_name_col = selected_name_col
+
+            if selected_contact_col != "Auto Detect":
+                manual_contact_col = selected_contact_col
+
+            if auto_name or auto_contact:
+                st.caption(
+                    f"Auto detected → Name: {auto_name or 'Not found'} | "
+                    f"Contact: {auto_contact or 'Not found'}"
+                )
+        except Exception as column_error:
+            st.warning(f"Could not read Excel headings: {column_error}")
+
+    st.markdown("---")
+
+    ready = excel_file is not None and ppt_file is not None
+
+    if ready:
+        st.success("Files are ready.")
+    else:
+        st.info("Upload both files to continue.")
+
+    st.caption("Downloads appear after a successful transfer.")
+
+    process_button = st.button(
+        "🚀 Transfer / Update PowerPoint",
+        type="primary",
+        use_container_width=True,
+        disabled=not ready
+    )
+
+    if ready:
         st.markdown("---")
+        st.caption("Selected files")
+        st.write(f"**Excel:** {excel_file.name}")
+        st.write(f"**PowerPoint:** {ppt_file.name}")
 
-        st.markdown("### 2. Transfer Content")
 
-        add_mode = st.selectbox(
-            "Select What to Add",
-            [
-                "SAP Code",
-                "Brand",
-                "Both (SAP Code + Brand)"
-            ],
-            key="add_mode"
+# =========================================================
+# =========================================================
+# MAIN PROCESS
+# =========================================================
+
+if not (excel_file and ppt_file):
+    st.markdown('<div class="section-title">Ready to Transfer</div>', unsafe_allow_html=True)
+    st.info(
+        "Upload one Excel file and one PowerPoint template, select the content to transfer, "
+        "then click Transfer / Update PowerPoint."
+    )
+
+if excel_file and ppt_file and process_button:
+    try:
+        progress = st.progress(0, text="Starting... 0%")
+        status_box = st.empty()
+        status_box.info("Reading files and preparing the transfer...")
+
+        df = pd.read_excel(excel_file)
+        mapping = detect_columns(df)
+
+        # Manual Name/Contact selections override automatic detection.
+        # SAP Code, Brand and the remaining fields continue to use the
+        # existing automatic detection logic.
+        if manual_name_col and manual_name_col in df.columns:
+            mapping["name"] = manual_name_col
+
+        if manual_contact_col and manual_contact_col in df.columns:
+            mapping["contact"] = manual_contact_col
+
+        missing = []
+        if not mapping.get("name"):
+            missing.append("Outlet / Dealer Name")
+        if not mapping.get("contact"):
+            missing.append("Contact Number")
+        if not mapping.get("sap") and add_mode in ["SAP Code", "Both (SAP Code + Brand)"]:
+            missing.append("SAP Code / Customer Code")
+        if not mapping.get("brand") and add_mode in ["Brand", "Both (SAP Code + Brand)"]:
+            missing.append("Brand")
+
+        if missing:
+            progress.empty()
+            status_box.error("Required Excel columns could not be detected: " + ", ".join(missing))
+            st.stop()
+
+        prs = Presentation(io.BytesIO(ppt_file.getvalue()))
+        ppt_slides = extract_ppt_fields(prs)
+
+        # ---------------- SAFE MATCHING ----------------
+        matching_results = []
+        used_slides = set()
+        total_rows = len(df)
+
+        for row_number, (excel_index, row) in enumerate(df.iterrows(), start=1):
+            excel_name = row.get(mapping.get("name"), "")
+            excel_contact = row.get(mapping.get("contact"), "")
+            sap_code = row.get(mapping.get("sap"), "") if mapping.get("sap") else ""
+            brand_value = row.get(mapping.get("brand"), "") if mapping.get("brand") else ""
+            excel_size = get_excel_size(row, mapping)
+
+            try:
+                if pd.isna(brand_value):
+                    brand_value = ""
+            except Exception:
+                pass
+            brand_value = str(brand_value).strip()
+
+            matched_slide, reason = find_best_slide(row, ppt_slides, mapping, used_slides)
+
+            if matched_slide is not None:
+                slide_no = matched_slide["slide"]
+                used_slides.add(slide_no)
+                matching_results.append({
+                    "excel_row": excel_index + 2,
+                    "excel_name": str(excel_name),
+                    "excel_contact": str(excel_contact),
+                    "excel_size": excel_size,
+                    "sap": str(sap_code),
+                    "brand": brand_value,
+                    "slide": slide_no,
+                    "ppt_name": matched_slide["name"],
+                    "ppt_contact": matched_slide["contact"],
+                    "ppt_size": matched_slide["size"],
+                    "info_shape_index": matched_slide["info_shape_index"],
+                    "matched": True,
+                    "reason": reason
+                })
+            else:
+                matching_results.append({
+                    "excel_row": excel_index + 2,
+                    "excel_name": str(excel_name),
+                    "excel_contact": str(excel_contact),
+                    "excel_size": excel_size,
+                    "sap": str(sap_code),
+                    "brand": brand_value,
+                    "slide": "",
+                    "ppt_name": "",
+                    "ppt_contact": "",
+                    "ppt_size": "",
+                    "info_shape_index": None,
+                    "matched": False,
+                    "reason": reason
+                })
+
+            percent = int((row_number / max(total_rows, 1)) * 50)
+            progress.progress(percent, text=f"Matching records... {row_number}/{total_rows} ({percent}%)")
+            status_box.info(f"Matching record {row_number} of {total_rows}...")
+
+        matched_count = sum(1 for result in matching_results if result["matched"])
+        unmatched_count = len(matching_results) - matched_count
+
+        # ---------------- POWERPOINT UPDATE ----------------
+        total_updates = len(matching_results)
+
+        def update_progress(done, total):
+            percent = 50 + int((done / max(total, 1)) * 50)
+            progress.progress(percent, text=f"Updating PowerPoint... {done}/{total} ({percent}%)")
+            status_box.info(f"Updating PowerPoint... {done} of {total}...")
+
+        updated_count, failed_count = update_ppt(
+            prs,
+            matching_results,
+            add_mode,
+            progress_callback=update_progress
         )
+
+        progress.progress(100, text="Completed — 100%")
+        status_box.success(f"Processing complete — {updated_count} slide(s) updated.")
+
+        # ---------------- SAVE OUTPUT ----------------
+        ppt_output = io.BytesIO()
+        prs.save(ppt_output)
+        ppt_output.seek(0)
+        final_ppt_bytes = ppt_output.getvalue()
+
+        base_ppt_name = re.sub(r"\.pptx$", "", ppt_file.name, flags=re.IGNORECASE)
+        updated_name = safe_filename(base_ppt_name + "_Update.pptx")
+
+        excel_base_name = re.sub(r"\.(xlsx|xls)$", "", excel_file.name, flags=re.IGNORECASE)
+        report_name = safe_filename(excel_base_name + "_Matching_Report.xlsx")
+
+        # ---------------- COMPLETION ----------------
+        st.success(
+            f"Transfer completed successfully. Updated: {updated_count} | "
+            f"Not matched: {unmatched_count}"
+        )
+
+        if failed_count > 0:
+            st.warning(f"{failed_count} matched slide(s) could not be updated.")
+
+        st.markdown("### 📥 Download Center")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.download_button(
+                "📥 Download Updated PowerPoint",
+                data=final_ppt_bytes,
+                file_name=updated_name,
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                use_container_width=True
+            )
+
+        with col2:
+            report_bytes = create_report_excel(matching_results)
+            st.download_button(
+                "📊 Download Matching Report",
+                data=report_bytes,
+                file_name=report_name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
 
         st.caption(
-            "SAP Code is added below District. "
-            "Brand is placed in the designated brand area."
+            "Safety rule: transfer is performed only after a unique Name + Contact match is confirmed. "
+            "Duplicate Name + Contact records are verified using Size."
         )
 
-        # ---------------------------------------------------------
-        # MANUAL MATCH COLUMN SELECTION
-        # ---------------------------------------------------------
-        # Auto-detection remains the default, but the user can
-        # explicitly choose which Excel columns contain Name and
-        # Contact. This removes dependency on Excel heading names.
-        manual_name_col = None
-        manual_contact_col = None
-
-        if excel_file is not None:
-            try:
-                excel_preview = pd.read_excel(io.BytesIO(excel_file.getvalue()), nrows=0)
-                excel_columns = [str(col) for col in excel_preview.columns]
-
-                auto_mapping_preview = detect_columns(excel_preview)
-                auto_name = auto_mapping_preview.get("name")
-                auto_contact = auto_mapping_preview.get("contact")
-
-                st.markdown("### 3. Match Columns")
-                st.caption("Choose the Excel columns used to match each PPT record. Auto Detect is selected by default.")
-
-                name_options = ["Auto Detect"] + excel_columns
-                contact_options = ["Auto Detect"] + excel_columns
-
-                name_default = (
-                    name_options.index(str(auto_name))
-                    if auto_name is not None and str(auto_name) in name_options
-                    else 0
-                )
-                contact_default = (
-                    contact_options.index(str(auto_contact))
-                    if auto_contact is not None and str(auto_contact) in contact_options
-                    else 0
-                )
-
-                selected_name_col = st.selectbox(
-                    "Match Name using Excel column",
-                    name_options,
-                    index=name_default,
-                    key="match_name_column"
-                )
-
-                selected_contact_col = st.selectbox(
-                    "Match Contact using Excel column",
-                    contact_options,
-                    index=contact_default,
-                    key="match_contact_column"
-                )
-
-                if selected_name_col != "Auto Detect":
-                    manual_name_col = selected_name_col
-
-                if selected_contact_col != "Auto Detect":
-                    manual_contact_col = selected_contact_col
-
-                if auto_name or auto_contact:
-                    st.caption(
-                        f"Auto detected → Name: {auto_name or 'Not found'} | "
-                        f"Contact: {auto_contact or 'Not found'}"
-                    )
-            except Exception as column_error:
-                st.warning(f"Could not read Excel headings: {column_error}")
-
-        st.markdown("---")
-
-        ready = excel_file is not None and ppt_file is not None
-
-        if ready:
-            st.success("Files are ready.")
-        else:
-            st.info("Upload both files to continue.")
-
-        st.caption("Downloads appear after a successful transfer.")
-
-        process_button = st.button(
-            "🚀 Transfer / Update PowerPoint",
-            type="primary",
-            use_container_width=True,
-            disabled=not ready
-        )
-
-        if ready:
-            st.markdown("---")
-            st.caption("Selected files")
-            st.write(f"**Excel:** {excel_file.name}")
-            st.write(f"**PowerPoint:** {ppt_file.name}")
-
-    if not (excel_file and ppt_file):
-        st.markdown('<div class="section-title">Ready to Transfer</div>', unsafe_allow_html=True)
-        st.info(
-            "Upload one Excel file and one PowerPoint template, select the content to transfer, "
-            "then click Transfer / Update PowerPoint."
-        )
-
-    if excel_file and ppt_file and process_button:
-        try:
-            progress = st.progress(0, text="Starting... 0%")
-            status_box = st.empty()
-            status_box.info("Reading files and preparing the transfer...")
-
-            df = pd.read_excel(excel_file)
-            mapping = detect_columns(df)
-
-            # Manual Name/Contact selections override automatic detection.
-            # SAP Code, Brand and the remaining fields continue to use the
-            # existing automatic detection logic.
-            if manual_name_col and manual_name_col in df.columns:
-                mapping["name"] = manual_name_col
-
-            if manual_contact_col and manual_contact_col in df.columns:
-                mapping["contact"] = manual_contact_col
-
-            missing = []
-            if not mapping.get("name"):
-                missing.append("Outlet / Dealer Name")
-            if not mapping.get("contact"):
-                missing.append("Contact Number")
-            if not mapping.get("sap") and add_mode in ["SAP Code", "Both (SAP Code + Brand)"]:
-                missing.append("SAP Code / Customer Code")
-            if not mapping.get("brand") and add_mode in ["Brand", "Both (SAP Code + Brand)"]:
-                missing.append("Brand")
-
-            if missing:
-                progress.empty()
-                status_box.error("Required Excel columns could not be detected: " + ", ".join(missing))
-                st.stop()
-
-            prs = Presentation(io.BytesIO(ppt_file.getvalue()))
-            ppt_slides = extract_ppt_fields(prs)
-
-            # ---------------- SAFE MATCHING ----------------
-            matching_results = []
-            used_slides = set()
-            total_rows = len(df)
-
-            for row_number, (excel_index, row) in enumerate(df.iterrows(), start=1):
-                excel_name = row.get(mapping.get("name"), "")
-                excel_contact = row.get(mapping.get("contact"), "")
-                sap_code = row.get(mapping.get("sap"), "") if mapping.get("sap") else ""
-                brand_value = row.get(mapping.get("brand"), "") if mapping.get("brand") else ""
-                excel_size = get_excel_size(row, mapping)
-
-                try:
-                    if pd.isna(brand_value):
-                        brand_value = ""
-                except Exception:
-                    pass
-                brand_value = str(brand_value).strip()
-
-                matched_slide, reason = find_best_slide(row, ppt_slides, mapping, used_slides)
-
-                if matched_slide is not None:
-                    slide_no = matched_slide["slide"]
-                    used_slides.add(slide_no)
-                    matching_results.append({
-                        "excel_row": excel_index + 2,
-                        "excel_name": str(excel_name),
-                        "excel_contact": str(excel_contact),
-                        "excel_size": excel_size,
-                        "sap": str(sap_code),
-                        "brand": brand_value,
-                        "slide": slide_no,
-                        "ppt_name": matched_slide["name"],
-                        "ppt_contact": matched_slide["contact"],
-                        "ppt_size": matched_slide["size"],
-                        "info_shape_index": matched_slide["info_shape_index"],
-                        "matched": True,
-                        "reason": reason
-                    })
-                else:
-                    matching_results.append({
-                        "excel_row": excel_index + 2,
-                        "excel_name": str(excel_name),
-                        "excel_contact": str(excel_contact),
-                        "excel_size": excel_size,
-                        "sap": str(sap_code),
-                        "brand": brand_value,
-                        "slide": "",
-                        "ppt_name": "",
-                        "ppt_contact": "",
-                        "ppt_size": "",
-                        "info_shape_index": None,
-                        "matched": False,
-                        "reason": reason
-                    })
-
-                percent = int((row_number / max(total_rows, 1)) * 50)
-                progress.progress(percent, text=f"Matching records... {row_number}/{total_rows} ({percent}%)")
-                status_box.info(f"Matching record {row_number} of {total_rows}...")
-
-            matched_count = sum(1 for result in matching_results if result["matched"])
-            unmatched_count = len(matching_results) - matched_count
-
-            # ---------------- POWERPOINT UPDATE ----------------
-            total_updates = len(matching_results)
-
-            def update_progress(done, total):
-                percent = 50 + int((done / max(total, 1)) * 50)
-                progress.progress(percent, text=f"Updating PowerPoint... {done}/{total} ({percent}%)")
-                status_box.info(f"Updating PowerPoint... {done} of {total}...")
-
-            updated_count, failed_count = update_ppt(
-                prs,
-                matching_results,
-                add_mode,
-                progress_callback=update_progress
-            )
-
-            progress.progress(100, text="Completed — 100%")
-            status_box.success(f"Processing complete — {updated_count} slide(s) updated.")
-
-            # ---------------- SAVE OUTPUT ----------------
-            ppt_output = io.BytesIO()
-            prs.save(ppt_output)
-            ppt_output.seek(0)
-            final_ppt_bytes = ppt_output.getvalue()
-
-            base_ppt_name = re.sub(r"\.pptx$", "", ppt_file.name, flags=re.IGNORECASE)
-            updated_name = safe_filename(base_ppt_name + "_Update.pptx")
-
-            excel_base_name = re.sub(r"\.(xlsx|xls)$", "", excel_file.name, flags=re.IGNORECASE)
-            report_name = safe_filename(excel_base_name + "_Matching_Report.xlsx")
-
-            # ---------------- COMPLETION ----------------
-            st.success(
-                f"Transfer completed successfully. Updated: {updated_count} | "
-                f"Not matched: {unmatched_count}"
-            )
-
-            if failed_count > 0:
-                st.warning(f"{failed_count} matched slide(s) could not be updated.")
-
-            st.markdown("### 📥 Download Center")
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.download_button(
-                    "📥 Download Updated PowerPoint",
-                    data=final_ppt_bytes,
-                    file_name=updated_name,
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    use_container_width=True
-                )
-
-            with col2:
-                report_bytes = create_report_excel(matching_results)
-                st.download_button(
-                    "📊 Download Matching Report",
-                    data=report_bytes,
-                    file_name=report_name,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
-
-            st.caption(
-                "Safety rule: transfer is performed only after a unique Name + Contact match is confirmed. "
-                "Duplicate Name + Contact records are verified using Size."
-            )
-
-        except Exception as e:
-            st.error("An error occurred while processing the files.")
-            st.exception(e)
+    except Exception as e:
+        st.error("An error occurred while processing the files.")
+        st.exception(e)
