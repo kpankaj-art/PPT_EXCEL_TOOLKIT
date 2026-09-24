@@ -78,7 +78,7 @@ def discover_tools():
         folder_name = path.parent.name
         icon, title, desc = BUILTIN_META.get(
             folder_name,
-            ("🛠️", nice_title(folder_name), "Custom app.py tool."),
+            ("🥷", nice_title(folder_name), "Custom app.py tool."),
         )
         discovered.append({
             "id": f"legacy:{path.parent.relative_to(TOOLS_DIR).as_posix()}",
