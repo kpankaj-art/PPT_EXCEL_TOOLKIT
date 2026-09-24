@@ -130,7 +130,7 @@ def show_home(tools):
         """
         <div class="hero">
             <h1>⚡ PPT & Excel Toolkit</h1>
-            <p>Ek hi dashboard se apne saare PPT / Excel automation tools run karein.</p>
+            <p>Dashboard PPT / Excel automation tools.</p>
         </div>
         """,
         unsafe_allow_html=True,
