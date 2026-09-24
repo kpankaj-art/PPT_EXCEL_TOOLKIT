@@ -99,12 +99,12 @@ def inject_css():
         [data-testid="stHeader"] {display:none;}
         #MainMenu {visibility:hidden;}
         footer {visibility:hidden;}
-        .block-container {padding:1.2rem 2rem 2.5rem 2rem; max-width:1500px;}
+        .block-container {padding:1.2rem 2rem 2.5rem 2rem; max-width:1300px;}
         .hero {padding:28px 30px; border-radius:20px; background:linear-gradient(135deg,#111827 0%,#1e293b 55%,#172554 100%); border:1px solid #334155; margin-bottom:24px;}
         .hero h1 {margin:0; font-size:2.1rem; color:#f8fafc;}
         .hero p {margin:8px 0 0; color:#cbd5e1; font-size:1rem;}
-        .tool-card {min-height:175px; padding:22px; border-radius:16px; border:1px solid #334155; background:#111827; margin-bottom:8px;}
-        .tool-icon {font-size:30px; margin-bottom:8px;}
+        .tool-card {min-height:170px; padding:22px; border-radius:16px; border:1px solid #334155; background:#111827; margin-bottom:8px;}
+        .tool-icon {font-size:28px; margin-bottom:8px;}
         .tool-title {font-size:1.08rem; font-weight:700; color:#f8fafc;}
         .tool-desc {font-size:.86rem; line-height:1.45; color:#94a3b8; margin-top:7px;}
         .section-title {font-size:1.15rem; font-weight:700; color:#e2e8f0; margin:8px 0 14px;}
