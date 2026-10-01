@@ -1,111 +1,96 @@
-    st.download_button(
-        label="⬇️ DOWNLOAD FIXED PPT",
-        data=st.session_state.fixed_ppt_bytes,
-        file_name=st.session_state.output_filename,
-        mime=(
-            "application/vnd.openxmlformats-officedocument."
-            "presentationml.presentation"
-        ),
-        type="primary",
-        use_container_width=True,
-        on_click="ignore"
-    )
+import streamlit as st
+import pandas as pd
+import re
+import io
+
+from pptx import Presentation
+from pptx.util import Inches
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 
 
 # =========================================================
-# REPORT
+# PAGE CONFIG
 # =========================================================
 
-if (
-    st.session_state.result_df
-    is not None
-):
-
-    result_df = (
-        st.session_state.result_df
-    )
-
-    st.markdown(
-        "### 📋 Processing Report"
-    )
-
-    updated = len(
-        result_df[
-            result_df[
-                "Status"
-            ].str.contains(
-                "Updated",
-                na=False
-            )
-        ]
-    )
-
-    not_found = len(
-        result_df[
-            result_df[
-                "Status"
-            ].str.contains(
-                "Not Found",
-                na=False
-            )
-        ]
-    )
-
-    missing = len(
-        result_df[
-            result_df[
-                "Status"
-            ].str.contains(
-                "Missing",
-                na=False
-            )
-        ]
-    )
-
-    c1, c2, c3 = st.columns(
-        3
-    )
-
-    with c1:
-
-        st.metric(
-            "Updated",
-            updated
-        )
-
-    with c2:
-
-        st.metric(
-            "Size Not Found",
-            not_found
-        )
-
-    with c3:
-
-        st.metric(
-            "Width/Height Missing",
-            missing
-        )
-
-    st.dataframe(
-        result_df,
-        use_container_width=True,
-        height=500
-    )
-
-
-# =========================================================
-# FOOTER
-# =========================================================
-
-st.markdown(
-    "---"
+st.set_page_config(
+    page_title="PPT SIZE FIXER V9",
+    page_icon="📐",
+    layout="wide"
 )
+
+
+# =========================================================
+# TITLE
+# =========================================================
+
+st.title("📐 PPT SIZE FIXER")
 
 st.caption(
-    "PPT SIZE FIXER V9 | "
-    "Excel Row 2 → Slide 1 | "
-    "Excel Row 3 → Slide 2 | "
-    "Automatic W/H detection | "
-    "Existing Size field only"
+    "Excel ke Width/Height columns automatically detect karke "
+    "PPT ke existing Size field ko update karega."
 )
+
+
+# =========================================================
+# SESSION STATE
+# =========================================================
+
+if "fixed_ppt_bytes" not in st.session_state:
+    st.session_state.fixed_ppt_bytes = None
+
+if "result_df" not in st.session_state:
+    st.session_state.result_df = None
+
+if "output_filename" not in st.session_state:
+    st.session_state.output_filename = (
+        "PPT_SIZE_FIXED_V9.pptx"
+    )
+
+
+# =========================================================
+# WIDTH ALIASES
+# =========================================================
+
+WIDTH_ALIASES = {
+    "w",
+    "width",
+    "wight",
+    "wid",
+    "widths",
+    "width inch",
+    "width inches",
+    "width inchs",
+    "width in inch",
+    "width in inches",
+    "width (inch)",
+    "width (inches)",
+    "w inch",
+    "w inches",
+    "w (inch)",
+    "w (inches)",
+    "board width",
+    "size width"
+}
+
+
+# =========================================================
+# HEIGHT ALIASES
+# =========================================================
+
+HEIGHT_ALIASES = {
+    "h",
+    "height",
+    "hight",
+    "heigt",
+    "ht",
+    "height inch",
+    "height inches",
+    "height inchs",
+    "height in inch",
+    "height in inches",
+    "height (inch)",
+    "height (inches)",
+    "h inch",
+    "h inches",
+    "h (inch)",
+    "h (inches)",
