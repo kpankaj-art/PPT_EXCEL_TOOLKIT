@@ -183,7 +183,7 @@ def run_legacy_app(path):
     st.set_page_config = safe_set_page_config
     st.file_uploader = large_file_uploader
     try:
-        runpy.run_path(str(path), run_name="__tool_app__")
+        runpy.run_path(str(path), run_name="__main__")
     finally:
         st.set_page_config = original_set_page_config
         st.file_uploader = original_file_uploader
