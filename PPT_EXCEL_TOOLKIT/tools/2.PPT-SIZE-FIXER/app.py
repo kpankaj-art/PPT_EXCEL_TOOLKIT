@@ -1,54 +1,19 @@
 import streamlit as st
+
 import pandas as pd
+
 import re
+
 import io
 
 from pptx import Presentation
+
 from pptx.util import Inches
 
-
-# =========================================================
-# PAGE CONFIG
-# =========================================================
-
-st.set_page_config(
-    page_title="PPT SIZE FIXER V9",
-    page_icon="📐",
-    layout="wide"
+FULL_SIZE_PATTERN = re.compile(
+    r"(?P<width>\d+(?:\.\d+)?)\s*[x×*]\s*(?P<height>\d+(?:\.\d+)?)",
+    re.IGNORECASE
 )
-
-
-# =========================================================
-# TITLE
-# =========================================================
-
-st.title("📐 PPT SIZE FIXER")
-
-st.caption(
-    "Excel ke Width/Height columns automatically detect karke "
-    "PPT ke existing Size field ko update karega."
-)
-
-
-# =========================================================
-# SESSION STATE
-# =========================================================
-
-if "fixed_ppt_bytes" not in st.session_state:
-    st.session_state.fixed_ppt_bytes = None
-
-if "result_df" not in st.session_state:
-    st.session_state.result_df = None
-
-if "output_filename" not in st.session_state:
-    st.session_state.output_filename = (
-        "PPT_SIZE_FIXED_V9.pptx"
-    )
-
-
-# =========================================================
-# WIDTH ALIASES
-# =========================================================
 
 WIDTH_ALIASES = {
     "w",
@@ -71,11 +36,6 @@ WIDTH_ALIASES = {
     "size width"
 }
 
-
-# =========================================================
-# HEIGHT ALIASES
-# =========================================================
-
 HEIGHT_ALIASES = {
     "h",
     "height",
@@ -96,11 +56,6 @@ HEIGHT_ALIASES = {
     "board height",
     "size height"
 }
-
-
-# =========================================================
-# PROTECTED WORDS
-# =========================================================
 
 PROTECTED_WORDS = {
     "qty",
@@ -124,11 +79,6 @@ PROTECTED_WORDS = {
     "type"
 }
 
-
-# =========================================================
-# NORMALIZE TEXT
-# =========================================================
-
 def normalize_text(value):
 
     if value is None:
@@ -149,11 +99,6 @@ def normalize_text(value):
     )
 
     return text.strip()
-
-
-# =========================================================
-# NORMALIZE COLUMN NAME
-# =========================================================
 
 def normalize_column_name(value):
 
@@ -179,11 +124,6 @@ def normalize_column_name(value):
     )
 
     return text.strip()
-
-
-# =========================================================
-# COLUMN ALIAS SCORE
-# =========================================================
 
 def alias_score(
     column_name,
@@ -277,25 +217,6 @@ def alias_score(
         score += 10
 
     return score
-
-
-# =========================================================
-# FIND WIDTH + HEIGHT COLUMNS
-#
-# IMPORTANT:
-# Width and Height are detected as a PAIR.
-#
-# Examples:
-#
-# W | H
-#
-# Width | Height
-#
-# Wight | Height
-#
-# Width (inches) | Height (inches)
-#
-# =========================================================
 
 def detect_size_columns(
     columns
@@ -439,11 +360,6 @@ def detect_size_columns(
         None
     )
 
-
-# =========================================================
-# CLEAN NUMBER
-# =========================================================
-
 def clean_number(value):
 
     if pd.isna(value):
@@ -489,11 +405,6 @@ def clean_number(value):
 
         return text
 
-
-# =========================================================
-# GET SHAPE TEXT
-# =========================================================
-
 def get_shape_text(
     shape
 ):
@@ -508,11 +419,6 @@ def get_shape_text(
     except Exception:
 
         return ""
-
-
-# =========================================================
-# SET SHAPE TEXT
-# =========================================================
 
 def set_shape_text(
     shape,
@@ -581,11 +487,6 @@ def set_shape_text(
 
             return False
 
-
-# =========================================================
-# COLLECT TEXT SHAPES
-# =========================================================
-
 def collect_text_shapes(
     slide
 ):
@@ -600,10 +501,8 @@ def collect_text_shapes(
             shape
         )
 
-        # Keep empty text boxes too. Some PPT templates have a blank
-        # Width (W) or Height (H) placeholder that must be filled from Excel.
-        # The size-position logic below will decide whether an empty box is
-        # actually the W/H field, so unrelated empty boxes are not modified.
+        if not text.strip():
+            continue
 
         items.append({
             "index": index,
@@ -613,39 +512,6 @@ def collect_text_shapes(
         })
 
     return items
-
-
-# =========================================================
-# SIZE PATTERN
-#
-# 300X48
-# 300 X 48
-# 300x48
-# 300×48
-# 300 * 48
-#
-# =========================================================
-
-FULL_SIZE_PATTERN = re.compile(
-    r"""
-    (?P<width>
-        \d+(?:\.\d+)?
-    )
-    \s*
-    [x×*]
-    \s*
-    (?P<height>
-        \d+(?:\.\d+)?
-    )
-    """,
-    re.IGNORECASE |
-    re.VERBOSE
-)
-
-
-# =========================================================
-# SIZE WORD
-# =========================================================
 
 def contains_size_word(
     text
@@ -662,11 +528,6 @@ def contains_size_word(
         )
     )
 
-
-# =========================================================
-# FULL SIZE
-# =========================================================
-
 def contains_full_size(
     text
 ):
@@ -679,26 +540,6 @@ def contains_full_size(
             str(text)
         )
     )
-
-
-# =========================================================
-# REPLACE SIZE INSIDE TEXTBOX
-#
-# Example:
-#
-# Shop Name : ABC
-# Address : XYZ
-# Type : GSB
-# Size:- 300X48 Inch
-#
-# Result:
-#
-# Shop Name : ABC
-# Address : XYZ
-# Type : GSB
-# Size:- 180X36 Inch
-#
-# =========================================================
 
 def replace_size_inside_text(
     text,
@@ -769,11 +610,6 @@ def replace_size_inside_text(
 
     return new_text, True
 
-
-# =========================================================
-# FIND INLINE SIZE
-# =========================================================
-
 def find_inline_size_shapes(
     items
 ):
@@ -801,11 +637,6 @@ def find_inline_size_shapes(
         )
 
     return result
-
-
-# =========================================================
-# FIND SIZE LABELS
-# =========================================================
 
 def find_size_labels(
     items
@@ -836,11 +667,6 @@ def find_size_labels(
 
     return result
 
-
-# =========================================================
-# NUMBER TEXT
-# =========================================================
-
 def is_number_text(
     text
 ):
@@ -854,11 +680,6 @@ def is_number_text(
             str(text)
         )
     )
-
-
-# =========================================================
-# X TEXT
-# =========================================================
 
 def is_x_text(
     text
@@ -874,19 +695,6 @@ def is_x_text(
         "×",
         "*"
     }
-
-
-# =========================================================
-# FIND SEPARATE SIZE
-#
-# Example:
-#
-# Size:
-# 15
-# X
-# 3
-#
-# =========================================================
 
 def find_separate_size(
     items,
@@ -1009,11 +817,8 @@ def find_separate_size(
                 if shape is x_shape:
                     continue
 
-                # Accept either an existing numeric value OR a blank
-                # placeholder. Blank W/H boxes are valid targets.
-                if (
-                    not is_number_text(item["text"])
-                    and str(item["text"]).strip() != ""
+                if not is_number_text(
+                    item["text"]
                 ):
                     continue
 
@@ -1106,11 +911,6 @@ def find_separate_size(
 
     return candidates[0]
 
-
-# =========================================================
-# FIND STANDALONE SIZE BOX
-# =========================================================
-
 def find_standalone_size(
     items,
     labels
@@ -1181,11 +981,6 @@ def find_standalone_size(
 
     return None
 
-
-# =========================================================
-# PROCESS ONE SLIDE
-# =========================================================
-
 def process_slide(
     slide,
     width,
@@ -1232,6 +1027,38 @@ def process_slide(
                     "action": (
                         f"{old_text} -> {new_text}"
                     )
+                }
+
+    # =====================================================
+    # 2. PARTIAL SIZE INSIDE ONE TEXTBOX
+    # =====================================================
+    # Handles values such as "180x", "x48", "180 X", or "X 48"
+    # where one dimension is blank but the existing textbox remains.
+
+    partial_patterns = [
+        (re.compile(r"^\s*(?P<width>\d+(?:\.\d+)?)\s*[x×*]\s*$", re.I), "height_blank"),
+        (re.compile(r"^\s*[x×*]\s*(?P<height>\d+(?:\.\d+)?)\s*$", re.I), "width_blank"),
+    ]
+
+    for item in items:
+        text = item["text"]
+        shape = item["shape"]
+        if not shape.has_text_frame:
+            continue
+        for pattern, mode in partial_patterns:
+            match = pattern.fullmatch(text.strip())
+            if not match:
+                continue
+            if mode == "height_blank":
+                old = text
+                new_text = f"{width}X{height}"
+            else:
+                old = text
+                new_text = f"{width}X{height}"
+            if set_shape_text(shape, new_text):
+                return {
+                    "status": "Updated Partial Size",
+                    "action": f"{old} -> {new_text}"
                 }
 
     # =====================================================
@@ -1290,6 +1117,111 @@ def process_slide(
             }
 
     # =====================================================
+    # 3. BLANK WIDTH / HEIGHT FIELD
+    # =====================================================
+    # Some templates contain a missing W or H textbox. Example:
+    #     [blank] X 48
+    # In the XML the blank textbox does not exist, so create it.
+
+    for label in labels:
+        label_shape = label["shape"]
+        label_left = label_shape.left
+        label_right = label_shape.left + label_shape.width
+        label_center_y = label_shape.top + label_shape.height / 2
+
+        x_candidates = []
+        for item in items:
+            shape = item["shape"]
+            if shape is label_shape or not is_x_text(item["text"]):
+                continue
+            center_x = shape.left + shape.width / 2
+            center_y = shape.top + shape.height / 2
+            if abs(center_y - label_center_y) > Inches(0.7):
+                continue
+            if center_x < label_left - Inches(0.5) or center_x > label_right + Inches(0.5):
+                continue
+            x_candidates.append(item)
+
+        for x_item in x_candidates:
+            x_shape = x_item["shape"]
+            x_center_x = x_shape.left + x_shape.width / 2
+            x_center_y = x_shape.top + x_shape.height / 2
+            left_numbers, right_numbers = [], []
+
+            for item in items:
+                shape = item["shape"]
+                if shape is label_shape or shape is x_shape or not is_number_text(item["text"]):
+                    continue
+                center_x = shape.left + shape.width / 2
+                center_y = shape.top + shape.height / 2
+                if abs(center_y - x_center_y) > Inches(0.55):
+                    continue
+                if center_x < label_left - Inches(0.25) or center_x > label_right + Inches(0.25):
+                    continue
+                if center_x < x_center_x:
+                    left_numbers.append(item)
+                elif center_x > x_center_x:
+                    right_numbers.append(item)
+
+            if left_numbers and right_numbers:
+                continue
+
+            ref_item = right_numbers[0] if right_numbers else (left_numbers[0] if left_numbers else None)
+            ref_shape = ref_item["shape"] if ref_item else x_shape
+            ref_y = ref_shape.top
+            ref_h = ref_shape.height
+            ref_w = ref_shape.width
+
+            def add_missing_box(value, side):
+                gap = Inches(0.08)
+                box_w = max(ref_w, Inches(0.32))
+                if side == "left":
+                    left = x_shape.left - gap - box_w
+                else:
+                    left = x_shape.left + x_shape.width + gap
+                box = slide.shapes.add_textbox(left, ref_y, box_w, ref_h)
+                tf = box.text_frame
+                tf.clear()
+                if ref_shape.has_text_frame:
+                    tf.margin_left = ref_shape.text_frame.margin_left
+                    tf.margin_right = ref_shape.text_frame.margin_right
+                    tf.margin_top = ref_shape.text_frame.margin_top
+                    tf.margin_bottom = ref_shape.text_frame.margin_bottom
+                    tf.vertical_anchor = ref_shape.text_frame.vertical_anchor
+                p = tf.paragraphs[0]
+                if ref_shape.has_text_frame and ref_shape.text_frame.paragraphs:
+                    p.alignment = ref_shape.text_frame.paragraphs[0].alignment
+                run = p.add_run()
+                run.text = str(value)
+                source_run = None
+                if ref_shape.has_text_frame:
+                    for para in ref_shape.text_frame.paragraphs:
+                        if para.runs:
+                            source_run = para.runs[0]
+                            break
+                if source_run:
+                    run.font.name = source_run.font.name
+                    run.font.size = source_run.font.size
+                    run.font.bold = source_run.font.bold
+                    run.font.italic = source_run.font.italic
+                    run.font.underline = source_run.font.underline
+                return box
+
+            if right_numbers and not left_numbers:
+                old_height = right_numbers[0]["text"]
+                add_missing_box(width, "left")
+                return {"status": "Updated Size - Created Blank Width", "action": f"[blank] X {old_height} -> {width} X {height}"}
+
+            if left_numbers and not right_numbers:
+                old_width = left_numbers[0]["text"]
+                add_missing_box(height, "right")
+                return {"status": "Updated Size - Created Blank Height", "action": f"{old_width} X [blank] -> {width} X {height}"}
+
+            add_missing_box(width, "left")
+            add_missing_box(height, "right")
+            return {"status": "Updated Size - Created Blank Width/Height", "action": f"[blank] X [blank] -> {width} X {height}"}
+
+    # =====================================================
     # 3. EXISTING COMBINED SIZE BOX
     # =====================================================
 
@@ -1334,11 +1266,6 @@ def process_slide(
         )
     }
 
-
-# =========================================================
-# READ EXCEL
-# =========================================================
-
 def read_excel_file(
     uploaded_file
 ):
@@ -1372,11 +1299,6 @@ def read_excel_file(
         sheet_name=None,
         engine="openpyxl"
     )
-
-
-# =========================================================
-# GET DATAFRAME
-# =========================================================
 
 def get_dataframe(
     uploaded_file
@@ -1432,15 +1354,6 @@ def get_dataframe(
         sheets[first_name],
         first_name
     )
-
-
-# =========================================================
-# PROCESS PPT
-#
-# Excel Row 2 -> Slide 1
-# Excel Row 3 -> Slide 2
-# Excel Row 4 -> Slide 3
-# =========================================================
 
 def process_ppt(
     ppt_bytes,
@@ -1622,337 +1535,327 @@ def process_ppt(
     )
 
 
-# =========================================================
-# EXCEL UPLOAD
-# =========================================================
+def render():
+    st.title("📐 PPT SIZE FIXER")
 
-st.markdown(
-    "### 📊 Excel Master File"
-)
-
-excel_file = st.file_uploader(
-    "Upload Excel",
-    type=[
-        "xlsx",
-        "xls",
-        "xlsm",
-        "csv"
-    ],
-    key="excel_upload_v9"
-)
-
-
-# =========================================================
-# PPT UPLOAD
-# =========================================================
-
-st.markdown(
-    "### 📄 PowerPoint File"
-)
-
-ppt_file = st.file_uploader(
-    "Upload PPTX",
-    type=[
-        "pptx"
-    ],
-    key="ppt_upload_v9"
-)
-
-
-# =========================================================
-# MAIN
-# =========================================================
-
-if excel_file is not None:
-
-    try:
-
-        df, sheet_name = get_dataframe(
-            excel_file
-        )
-
-        # =================================================
-        # AUTOMATIC WIDTH + HEIGHT DETECTION
-        # =================================================
-
-        width_col, height_col = (
-            detect_size_columns(
-                df.columns
-            )
-        )
-
-        # -------------------------------------------------
-        # Width/Height not detected
-        # -------------------------------------------------
-
-        if (
-            width_col is None
-            or
-            height_col is None
-        ):
-
-            st.error(
-                "❌ Width/Height columns automatically detect nahi hue."
-            )
-
-            st.write(
-                "Excel ke available headings:"
-            )
-
-            st.write(
-                list(df.columns)
-            )
-
-            st.stop()
-
-        # -------------------------------------------------
-        # Same column safety
-        # -------------------------------------------------
-
-        if width_col == height_col:
-
-            st.error(
-                "❌ Width aur Height same column detect hue. "
-                "Processing stop kar di gayi."
-            )
-
-            st.write(
-                "Available headings:"
-            )
-
-            st.write(
-                list(df.columns)
-            )
-
-            st.stop()
-
-        # -------------------------------------------------
-        # Small confirmation
-        # -------------------------------------------------
-
-        st.success(
-            f"Excel loaded successfully | "
-            f"Width = {width_col} | "
-            f"Height = {height_col}"
-        )
-
-        # =================================================
-        # PPT
-        # =================================================
-
-        if ppt_file is not None:
-
-            if st.button(
-                "🚀 FIX PPT SIZE",
-                type="primary",
-                use_container_width=True
-            ):
-
-                try:
-
-                    # Clear old result
-                    st.session_state.fixed_ppt_bytes = None
-                    st.session_state.result_df = None
-
-                    ppt_bytes = (
-                        ppt_file.getvalue()
-                    )
-
-                    # -------------------------------------
-                    # Process
-                    # -------------------------------------
-
-                    prs, result_df = process_ppt(
-                        ppt_bytes,
-                        df,
-                        width_col,
-                        height_col
-                    )
-
-                    # -------------------------------------
-                    # Save
-                    # -------------------------------------
-
-                    output_buffer = io.BytesIO()
-
-                    prs.save(
-                        output_buffer
-                    )
-
-                    output_buffer.seek(
-                        0
-                    )
-
-                    st.session_state.fixed_ppt_bytes = (
-                        output_buffer.getvalue()
-                    )
-
-                    st.session_state.result_df = (
-                        result_df
-                    )
-
-                    st.session_state.output_filename = (
-                        "PPT_SIZE_FIXED_V9.pptx"
-                    )
-
-                    st.success(
-                        "✅ PPT successfully processed."
-                    )
-
-                except Exception as e:
-
-                    st.error(
-                        f"❌ Processing Error: {str(e)}"
-                    )
-
-                    st.exception(e)
-
-        else:
-
-            st.info(
-                "PPTX file upload karo."
-            )
-
-    except Exception as e:
-
-        st.error(
-            f"❌ Excel Error: {str(e)}"
-        )
-
-        st.exception(e)
-
-else:
-
-    st.info(
-        "Pehle Excel Master File upload karo."
+    st.caption(
+        "Excel ke Width/Height columns automatically detect karke "
+        "PPT ke existing Size field ko update karega."
     )
 
+    if "fixed_ppt_bytes" not in st.session_state:
+        st.session_state.fixed_ppt_bytes = None
 
-# =========================================================
-# DOWNLOAD
-# =========================================================
+    if "result_df" not in st.session_state:
+        st.session_state.result_df = None
 
-if (
-    st.session_state.fixed_ppt_bytes
-    is not None
-):
+    if "output_filename" not in st.session_state:
+        st.session_state.output_filename = (
+            "PPT_SIZE_FIXED_V9.pptx"
+        )
+
+    st.markdown(
+        "### 📊 Excel Master File"
+    )
+
+    excel_file = st.file_uploader(
+        "Upload Excel",
+        type=[
+            "xlsx",
+            "xls",
+            "xlsm",
+            "csv"
+        ],
+        key="excel_upload_v9"
+    )
+
+    st.markdown(
+        "### 📄 PowerPoint File"
+    )
+
+    ppt_file = st.file_uploader(
+        "Upload PPTX",
+        type=[
+            "pptx"
+        ],
+        key="ppt_upload_v9"
+    )
+
+    if excel_file is not None:
+
+        try:
+
+            df, sheet_name = get_dataframe(
+                excel_file
+            )
+
+            # =================================================
+            # AUTOMATIC WIDTH + HEIGHT DETECTION
+            # =================================================
+
+            width_col, height_col = (
+                detect_size_columns(
+                    df.columns
+                )
+            )
+
+            # -------------------------------------------------
+            # Width/Height not detected
+            # -------------------------------------------------
+
+            if (
+                width_col is None
+                or
+                height_col is None
+            ):
+
+                st.error(
+                    "❌ Width/Height columns automatically detect nahi hue."
+                )
+
+                st.write(
+                    "Excel ke available headings:"
+                )
+
+                st.write(
+                    list(df.columns)
+                )
+
+                st.stop()
+
+            # -------------------------------------------------
+            # Same column safety
+            # -------------------------------------------------
+
+            if width_col == height_col:
+
+                st.error(
+                    "❌ Width aur Height same column detect hue. "
+                    "Processing stop kar di gayi."
+                )
+
+                st.write(
+                    "Available headings:"
+                )
+
+                st.write(
+                    list(df.columns)
+                )
+
+                st.stop()
+
+            # -------------------------------------------------
+            # Small confirmation
+            # -------------------------------------------------
+
+            st.success(
+                f"Excel loaded successfully | "
+                f"Width = {width_col} | "
+                f"Height = {height_col}"
+            )
+
+            # =================================================
+            # PPT
+            # =================================================
+
+            if ppt_file is not None:
+
+                if st.button(
+                    "🚀 FIX PPT SIZE",
+                    type="primary",
+                    use_container_width=True
+                ):
+
+                    try:
+
+                        # Clear old result
+                        st.session_state.fixed_ppt_bytes = None
+                        st.session_state.result_df = None
+
+                        ppt_bytes = (
+                            ppt_file.getvalue()
+                        )
+
+                        # -------------------------------------
+                        # Process
+                        # -------------------------------------
+
+                        prs, result_df = process_ppt(
+                            ppt_bytes,
+                            df,
+                            width_col,
+                            height_col
+                        )
+
+                        # -------------------------------------
+                        # Save
+                        # -------------------------------------
+
+                        output_buffer = io.BytesIO()
+
+                        prs.save(
+                            output_buffer
+                        )
+
+                        output_buffer.seek(
+                            0
+                        )
+
+                        st.session_state.fixed_ppt_bytes = (
+                            output_buffer.getvalue()
+                        )
+
+                        st.session_state.result_df = (
+                            result_df
+                        )
+
+                        st.session_state.output_filename = (
+                            "PPT_SIZE_FIXED_V9.pptx"
+                        )
+
+                        st.success(
+                            "✅ PPT successfully processed."
+                        )
+
+                    except Exception as e:
+
+                        st.error(
+                            f"❌ Processing Error: {str(e)}"
+                        )
+
+                        st.exception(e)
+
+            else:
+
+                st.info(
+                    "PPTX file upload karo."
+                )
+
+        except Exception as e:
+
+            st.error(
+                f"❌ Excel Error: {str(e)}"
+            )
+
+            st.exception(e)
+
+    else:
+
+        st.info(
+            "Pehle Excel Master File upload karo."
+        )
+
+    if (
+        st.session_state.fixed_ppt_bytes
+        is not None
+    ):
+
+        st.markdown(
+            "---"
+        )
+
+        st.markdown(
+            "### ✅ Fixed PPT Ready"
+        )
+
+        st.download_button(
+            label="⬇️ DOWNLOAD FIXED PPT",
+            data=st.session_state.fixed_ppt_bytes,
+            file_name=st.session_state.output_filename,
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "presentationml.presentation"
+            ),
+            type="primary",
+            use_container_width=True,
+            on_click="ignore"
+        )
+
+    if (
+        st.session_state.result_df
+        is not None
+    ):
+
+        result_df = (
+            st.session_state.result_df
+        )
+
+        st.markdown(
+            "### 📋 Processing Report"
+        )
+
+        updated = len(
+            result_df[
+                result_df[
+                    "Status"
+                ].str.contains(
+                    "Updated",
+                    na=False
+                )
+            ]
+        )
+
+        not_found = len(
+            result_df[
+                result_df[
+                    "Status"
+                ].str.contains(
+                    "Not Found",
+                    na=False
+                )
+            ]
+        )
+
+        missing = len(
+            result_df[
+                result_df[
+                    "Status"
+                ].str.contains(
+                    "Missing",
+                    na=False
+                )
+            ]
+        )
+
+        c1, c2, c3 = st.columns(
+            3
+        )
+
+        with c1:
+
+            st.metric(
+                "Updated",
+                updated
+            )
+
+        with c2:
+
+            st.metric(
+                "Size Not Found",
+                not_found
+            )
+
+        with c3:
+
+            st.metric(
+                "Width/Height Missing",
+                missing
+            )
+
+        st.dataframe(
+            result_df,
+            use_container_width=True,
+            height=500
+        )
 
     st.markdown(
         "---"
     )
 
-    st.markdown(
-        "### ✅ Fixed PPT Ready"
+    st.caption(
+        "PPT SIZE FIXER V9 | "
+        "Excel Row 2 → Slide 1 | "
+        "Excel Row 3 → Slide 2 | "
+        "Automatic W/H detection | "
+        "Existing Size field only"
     )
-
-    st.download_button(
-        label="⬇️ DOWNLOAD FIXED PPT",
-        data=st.session_state.fixed_ppt_bytes,
-        file_name=st.session_state.output_filename,
-        mime=(
-            "application/vnd.openxmlformats-officedocument."
-            "presentationml.presentation"
-        ),
-        type="primary",
-        use_container_width=True,
-        on_click="ignore"
-    )
-
-
-# =========================================================
-# REPORT
-# =========================================================
-
-if (
-    st.session_state.result_df
-    is not None
-):
-
-    result_df = (
-        st.session_state.result_df
-    )
-
-    st.markdown(
-        "### 📋 Processing Report"
-    )
-
-    updated = len(
-        result_df[
-            result_df[
-                "Status"
-            ].str.contains(
-                "Updated",
-                na=False
-            )
-        ]
-    )
-
-    not_found = len(
-        result_df[
-            result_df[
-                "Status"
-            ].str.contains(
-                "Not Found",
-                na=False
-            )
-        ]
-    )
-
-    missing = len(
-        result_df[
-            result_df[
-                "Status"
-            ].str.contains(
-                "Missing",
-                na=False
-            )
-        ]
-    )
-
-    c1, c2, c3 = st.columns(
-        3
-    )
-
-    with c1:
-
-        st.metric(
-            "Updated",
-            updated
-        )
-
-    with c2:
-
-        st.metric(
-            "Size Not Found",
-            not_found
-        )
-
-    with c3:
-
-        st.metric(
-            "Width/Height Missing",
-            missing
-        )
-
-    st.dataframe(
-        result_df,
-        use_container_width=True,
-        height=500
-    )
-
-
-# =========================================================
-# FOOTER
-# =========================================================
-
-st.markdown(
-    "---"
-)
-
-st.caption(
-    "PPT SIZE FIXER V9 | "
-    "Excel Row 2 → Slide 1 | "
-    "Excel Row 3 → Slide 2 | "
-    "Automatic W/H detection | "
-    "Existing Size field only"
-)
