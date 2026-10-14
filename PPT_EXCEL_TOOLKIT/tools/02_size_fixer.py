@@ -11,18 +11,6 @@ from pptx.util import Inches, Pt
 from pptx.enum.text import PP_ALIGN
 from pptx.dml.color import RGBColor
 
-
-# =========================================================
-# STREAMLIT CONFIG
-# =========================================================
-
-st.set_page_config(
-    page_title="PPT Size Update",
-    page_icon="📐",
-    layout="wide"
-)
-
-
 # =========================================================
 # CONSTANTS
 # =========================================================
@@ -710,286 +698,289 @@ def process_ppt(
     )
 
 
-# =========================================================
-# UI
-# =========================================================
+def run_tool(max_upload_mb=MAX_FILE_MB):
+    MAX_FILE_MB = max_upload_mb
 
-st.markdown(
-    """
-    <style>
+    # =========================================================
+    # UI
+    # =========================================================
 
-    .main-title {
-        font-size: 32px;
-        font-weight: 800;
-        margin-bottom: 5px;
-    }
+    st.markdown(
+        """
+        <style>
 
-    .subtitle {
-        color: #9ca3af;
-        margin-bottom: 25px;
-    }
+        .main-title {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
 
-    .info-box {
-        padding: 18px;
-        border-radius: 12px;
-        background: #111827;
-        border: 1px solid #334155;
-        margin-bottom: 20px;
-    }
+        .subtitle {
+            color: #9ca3af;
+            margin-bottom: 25px;
+        }
 
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+        .info-box {
+            padding: 18px;
+            border-radius: 12px;
+            background: #111827;
+            border: 1px solid #334155;
+            margin-bottom: 20px;
+        }
 
-
-st.markdown(
-    '<div class="main-title">📐 PPT Size Update</div>',
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    '<div class="subtitle">'
-    'Excel ke W/H values ko PPT mein automatically update karein.'
-    '</div>',
-    unsafe_allow_html=True
-)
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
 
-st.markdown(
-    """
-    <div class="info-box">
-    <b>How it works</b><br>
-    Excel upload → PPT upload → W/H detect → 
-    W × H same line → Fixed PPT download
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+    st.markdown(
+        '<div class="main-title">📐 PPT Size Update</div>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        '<div class="subtitle">'
+        'Excel ke W/H values ko PPT mein automatically update karein.'
+        '</div>',
+        unsafe_allow_html=True
+    )
 
 
-# =========================================================
-# UPLOADS
-# =========================================================
-
-excel_file = st.file_uploader(
-    "📊 Excel Master File",
-    type=["xlsx", "xls"],
-    key="size_excel"
-)
-
-ppt_file = st.file_uploader(
-    "📄 PowerPoint File",
-    type=["pptx"],
-    key="size_ppt"
-)
+    st.markdown(
+        """
+        <div class="info-box">
+        <b>How it works</b><br>
+        Excel upload → PPT upload → W/H detect → 
+        W × H same line → Fixed PPT download
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
-# =========================================================
-# FILE INFO
-# =========================================================
+    # =========================================================
+    # UPLOADS
+    # =========================================================
 
-if excel_file is not None:
+    excel_file = st.file_uploader(
+        "📊 Excel Master File",
+        type=["xlsx", "xls"],
+        key="size_excel"
+    )
 
-    size_mb = excel_file.size / (1024 * 1024)
-
-    if size_mb > MAX_FILE_MB:
-        st.error(
-            f"Excel file {size_mb:.1f} MB hai. "
-            f"Maximum allowed size {MAX_FILE_MB} MB hai."
-        )
-        excel_file = None
-
-    else:
-
-        st.success(
-            f"Excel loaded: {excel_file.name} "
-            f"({size_mb:.1f} MB)"
-        )
+    ppt_file = st.file_uploader(
+        "📄 PowerPoint File",
+        type=["pptx"],
+        key="size_ppt"
+    )
 
 
-if ppt_file is not None:
+    # =========================================================
+    # FILE INFO
+    # =========================================================
 
-    size_mb = ppt_file.size / (1024 * 1024)
+    if excel_file is not None:
 
-    if size_mb > MAX_FILE_MB:
+        size_mb = excel_file.size / (1024 * 1024)
 
-        st.error(
-            f"PPT file {size_mb:.1f} MB hai. "
-            f"Maximum allowed size {MAX_FILE_MB} MB hai."
-        )
-
-        ppt_file = None
-
-    else:
-
-        st.success(
-            f"PPT loaded: {ppt_file.name} "
-            f"({size_mb:.1f} MB)"
-        )
-
-
-# =========================================================
-# PROCESS
-# =========================================================
-
-if excel_file is not None and ppt_file is not None:
-
-    st.divider()
-
-    if st.button(
-        "🚀 UPDATE PPT SIZE",
-        type="primary",
-        use_container_width=True
-    ):
-
-        progress = st.progress(0)
-
-        status_box = st.empty()
-
-        try:
-
-            status_box.info(
-                "📊 Excel read ho rahi hai..."
+        if size_mb > MAX_FILE_MB:
+            st.error(
+                f"Excel file {size_mb:.1f} MB hai. "
+                f"Maximum allowed size {MAX_FILE_MB} MB hai."
             )
+            excel_file = None
 
-            excel_bytes = excel_file.getvalue()
-
-            excel_df = pd.read_excel(
-                io.BytesIO(excel_bytes)
-            )
-
-            progress.progress(20)
-
-            status_box.info(
-                "📄 PPT process ho rahi hai..."
-            )
-
-            ppt_bytes = ppt_file.getvalue()
-
-            fixed_ppt, report_df, width_col, height_col = process_ppt(
-                ppt_bytes,
-                excel_df
-            )
-
-            progress.progress(100)
+        else:
 
             st.success(
-                f"✅ Processing complete — "
-                f"W column: `{width_col}` | "
-                f"H column: `{height_col}`"
+                f"Excel loaded: {excel_file.name} "
+                f"({size_mb:.1f} MB)"
             )
 
-            # -------------------------------------------------
-            # Statistics
-            # -------------------------------------------------
 
-            total = len(report_df)
+    if ppt_file is not None:
 
-            updated = len(
-                report_df[
-                    report_df["Status"].isin(
-                        ["Updated", "Created"]
-                    )
-                ]
-            )
+        size_mb = ppt_file.size / (1024 * 1024)
 
-            errors = total - updated
-
-            c1, c2, c3 = st.columns(3)
-
-            with c1:
-                st.metric(
-                    "Total Slides",
-                    total
-                )
-
-            with c2:
-                st.metric(
-                    "Updated",
-                    updated
-                )
-
-            with c3:
-                st.metric(
-                    "Needs Review",
-                    errors
-                )
-
-            # -------------------------------------------------
-            # Report
-            # -------------------------------------------------
-
-            st.subheader(
-                "📋 Processing Report"
-            )
-
-            st.dataframe(
-                report_df,
-                use_container_width=True,
-                hide_index=True
-            )
-
-            # -------------------------------------------------
-            # Download PPT
-            # -------------------------------------------------
-
-            st.download_button(
-                label="📥 Download Fixed PPT",
-                data=fixed_ppt,
-                file_name=(
-                    os.path.splitext(
-                        ppt_file.name
-                    )[0]
-                    + "_SIZE_UPDATED.pptx"
-                ),
-                mime=(
-                    "application/vnd.openxmlformats-"
-                    "officedocument.presentationml.presentation"
-                ),
-                use_container_width=True
-            )
-
-            # -------------------------------------------------
-            # Download Report
-            # -------------------------------------------------
-
-            report_buffer = io.BytesIO()
-
-            with pd.ExcelWriter(
-                report_buffer,
-                engine="openpyxl"
-            ) as writer:
-
-                report_df.to_excel(
-                    writer,
-                    index=False,
-                    sheet_name="Processing Report"
-                )
-
-            report_buffer.seek(0)
-
-            st.download_button(
-                label="📊 Download Processing Report",
-                data=report_buffer.getvalue(),
-                file_name="PPT_SIZE_UPDATE_REPORT.xlsx",
-                mime=(
-                    "application/vnd.openxmlformats-"
-                    "officedocument.spreadsheetml.sheet"
-                ),
-                use_container_width=True
-            )
-
-        except Exception as e:
+        if size_mb > MAX_FILE_MB:
 
             st.error(
-                f"❌ Processing Error: {str(e)}"
+                f"PPT file {size_mb:.1f} MB hai. "
+                f"Maximum allowed size {MAX_FILE_MB} MB hai."
             )
 
-            st.exception(e)
+            ppt_file = None
 
-else:
+        else:
 
-    st.info(
-        "👆 Pehle Excel Master File aur PowerPoint File upload karein."
-    )
+            st.success(
+                f"PPT loaded: {ppt_file.name} "
+                f"({size_mb:.1f} MB)"
+            )
+
+
+    # =========================================================
+    # PROCESS
+    # =========================================================
+
+    if excel_file is not None and ppt_file is not None:
+
+        st.divider()
+
+        if st.button(
+            "🚀 UPDATE PPT SIZE",
+            type="primary",
+            use_container_width=True
+        ):
+
+            progress = st.progress(0)
+
+            status_box = st.empty()
+
+            try:
+
+                status_box.info(
+                    "📊 Excel read ho rahi hai..."
+                )
+
+                excel_bytes = excel_file.getvalue()
+
+                excel_df = pd.read_excel(
+                    io.BytesIO(excel_bytes)
+                )
+
+                progress.progress(20)
+
+                status_box.info(
+                    "📄 PPT process ho rahi hai..."
+                )
+
+                ppt_bytes = ppt_file.getvalue()
+
+                fixed_ppt, report_df, width_col, height_col = process_ppt(
+                    ppt_bytes,
+                    excel_df
+                )
+
+                progress.progress(100)
+
+                st.success(
+                    f"✅ Processing complete — "
+                    f"W column: `{width_col}` | "
+                    f"H column: `{height_col}`"
+                )
+
+                # -------------------------------------------------
+                # Statistics
+                # -------------------------------------------------
+
+                total = len(report_df)
+
+                updated = len(
+                    report_df[
+                        report_df["Status"].isin(
+                            ["Updated", "Created"]
+                        )
+                    ]
+                )
+
+                errors = total - updated
+
+                c1, c2, c3 = st.columns(3)
+
+                with c1:
+                    st.metric(
+                        "Total Slides",
+                        total
+                    )
+
+                with c2:
+                    st.metric(
+                        "Updated",
+                        updated
+                    )
+
+                with c3:
+                    st.metric(
+                        "Needs Review",
+                        errors
+                    )
+
+                # -------------------------------------------------
+                # Report
+                # -------------------------------------------------
+
+                st.subheader(
+                    "📋 Processing Report"
+                )
+
+                st.dataframe(
+                    report_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                # -------------------------------------------------
+                # Download PPT
+                # -------------------------------------------------
+
+                st.download_button(
+                    label="📥 Download Fixed PPT",
+                    data=fixed_ppt,
+                    file_name=(
+                        os.path.splitext(
+                            ppt_file.name
+                        )[0]
+                        + "_SIZE_UPDATED.pptx"
+                    ),
+                    mime=(
+                        "application/vnd.openxmlformats-"
+                        "officedocument.presentationml.presentation"
+                    ),
+                    use_container_width=True
+                )
+
+                # -------------------------------------------------
+                # Download Report
+                # -------------------------------------------------
+
+                report_buffer = io.BytesIO()
+
+                with pd.ExcelWriter(
+                    report_buffer,
+                    engine="openpyxl"
+                ) as writer:
+
+                    report_df.to_excel(
+                        writer,
+                        index=False,
+                        sheet_name="Processing Report"
+                    )
+
+                report_buffer.seek(0)
+
+                st.download_button(
+                    label="📊 Download Processing Report",
+                    data=report_buffer.getvalue(),
+                    file_name="PPT_SIZE_UPDATE_REPORT.xlsx",
+                    mime=(
+                        "application/vnd.openxmlformats-"
+                        "officedocument.spreadsheetml.sheet"
+                    ),
+                    use_container_width=True
+                )
+
+            except Exception as e:
+
+                st.error(
+                    f"❌ Processing Error: {str(e)}"
+                )
+
+                st.exception(e)
+
+    else:
+
+        st.info(
+            "👆 Pehle Excel Master File aur PowerPoint File upload karein."
+        )
